@@ -27,7 +27,14 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Iterator;
 import java.io.InputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import android.app.AlertDialog;
 
 public class SettingsActivity extends Activity {
     private SharedPreferences prefs;
@@ -434,6 +441,49 @@ public class SettingsActivity extends Activity {
         });
         content.addView(saveBtn);
         
+        // 导出/导入配置按钮
+        if (editingServerName == null) {
+            LinearLayout exportImportLayout = new LinearLayout(this);
+            exportImportLayout.setOrientation(LinearLayout.HORIZONTAL);
+            exportImportLayout.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            exportImportLayout.setTopMargin(20);
+            
+            // 导出按钮
+            Button exportBtn = new Button(this);
+            exportBtn.setText("📤 导出配置");
+            exportBtn.setTextSize(14);
+            exportBtn.setPadding(20, 16, 20, 16);
+            exportBtn.setBackgroundColor(Color.parseColor("#4CAF50"));
+            exportBtn.setTextColor(Color.WHITE);
+            exportBtn.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            exportBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    exportConfig();
+                }
+            });
+            
+            // 导入按钮
+            Button importBtn = new Button(this);
+            importBtn.setText("📥 导入配置");
+            importBtn.setTextSize(14);
+            importBtn.setPadding(20, 16, 20, 16);
+            importBtn.setBackgroundColor(Color.parseColor("#FF9800"));
+            importBtn.setTextColor(Color.WHITE);
+            importBtn.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            importBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    importConfig();
+                }
+            });
+            
+            exportImportLayout.addView(exportBtn);
+            exportImportLayout.addView(importBtn);
+            content.addView(exportImportLayout);
+        }
+        
         // 已保存的服务器列表
         if (editingServerName == null) {
             TextView listTitle = new TextView(this);
@@ -783,6 +833,139 @@ public class SettingsActivity extends Activity {
                 serverListContainer.addView(item);
                 
             } catch (Exception e) {}
+        }
+    }
+    
+    // 导出配置到文件
+    private void exportConfig() {
+        try {
+            JSONObject config = new JSONObject();
+            
+            // 导出所有配置项
+            Map<String, ?> allPrefs = prefs.getAll();
+            for (Map.Entry<String, ?> entry : allPrefs.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+                if (value instanceof String) {
+                    config.put(key, (String) value);
+                } else if (value instanceof Integer) {
+                    config.put(key, (Integer) value);
+                } else if (value instanceof Boolean) {
+                    config.put(key, (Boolean) value);
+                } else if (value instanceof Long) {
+                    config.put(key, (Long) value);
+                } else if (value instanceof Float) {
+                    config.put(key, (Float) value);
+                }
+            }
+            
+            // 添加版本标记
+            config.put("_export_version", "ChatApp v3.3");
+            config.put("_export_time", System.currentTimeMillis());
+            
+            // 保存到外部存储
+            File exportFile = new File(getExternalFilesDir(null), "chatapp_config.json");
+            FileWriter writer = new FileWriter(exportFile);
+            writer.write(config.toString(2));
+            writer.close();
+            
+            Toast.makeText(this, "✅ 配置已导出到:\n" + exportFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            
+        } catch (Exception e) {
+            Toast.makeText(this, "❌ 导出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    // 从文件导入配置
+    private void importConfig() {
+        try {
+            // 查找配置文件
+            File exportFile = new File(getExternalFilesDir(null), "chatapp_config.json");
+            
+            if (!exportFile.exists()) {
+                // 尝试在 Downloads 目录查找
+                File downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
+                exportFile = new File(downloadsDir, "chatapp_config.json");
+            }
+            
+            if (!exportFile.exists()) {
+                Toast.makeText(this, "❌ 未找到配置文件\n请确保 chatapp_config.json 在下载目录", Toast.LENGTH_LONG).show();
+                return;
+            }
+            
+            // 读取配置
+            BufferedReader reader = new BufferedReader(new FileReader(exportFile));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            reader.close();
+            
+            JSONObject config = new JSONObject(sb.toString());
+            
+            // 确认导入
+            new AlertDialog.Builder(this)
+                .setTitle("📥 确认导入")
+                .setMessage("将导入以下配置:\n\n• 服务器列表\n• 当前服务器\n• 字体大小设置\n• 头像设置\n\n⚠️ 这将覆盖现有配置，是否继续？")
+                .setPositiveButton("导入", (dialog, which) -> {
+                    try {
+                        applyImportedConfig(config);
+                    } catch (Exception e) {
+                        Toast.makeText(this, "❌ 导入失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+            
+        } catch (Exception e) {
+            Toast.makeText(this, "❌ 读取配置失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    // 应用导入的配置
+    private void applyImportedConfig(JSONObject config) {
+        try {
+            SharedPreferences.Editor editor = prefs.edit();
+            
+            // 排除元数据字段
+            String[] metaFields = {"_export_version", "_export_time"};
+            
+            @SuppressWarnings("unchecked")
+            Iterator<String> keys = config.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                
+                // 跳过元数据
+                boolean isMeta = false;
+                for (String meta : metaFields) {
+                    if (meta.equals(key)) {
+                        isMeta = true;
+                        break;
+                    }
+                }
+                if (isMeta) continue;
+                
+                Object value = config.get(key);
+                if (value instanceof String) {
+                    editor.putString(key, (String) value);
+                } else if (value instanceof Integer) {
+                    editor.putInt(key, (Integer) value);
+                } else if (value instanceof Boolean) {
+                    editor.putBoolean(key, (Boolean) value);
+                } else if (value instanceof Long) {
+                    editor.putLong(key, (Long) value);
+                } else if (value instanceof Float) {
+                    editor.putFloat(key, ((Number) value).floatValue());
+                }
+            }
+            
+            editor.apply();
+            
+            Toast.makeText(this, "✅ 配置导入成功！\n请重启应用以生效", Toast.LENGTH_LONG).show();
+            
+        } catch (Exception e) {
+            Toast.makeText(this, "❌ 应用配置失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 }
