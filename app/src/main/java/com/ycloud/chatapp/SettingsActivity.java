@@ -54,6 +54,9 @@ public class SettingsActivity extends Activity {
     private String currentAvatarImagePath = null;
     
     private static final int PICK_IMAGE_REQUEST = 100;
+    private static final int REQUEST_EXPORT = 101;
+    private static final int REQUEST_IMPORT = 102;
+    private String exportConfigData;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -732,10 +735,64 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        
+        // 图片选择处理
         if (requestCode == PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null) {
             Uri imageUri = data.getData();
             if (imageUri != null) {
                 handleSelectedImage(imageUri);
+            }
+        }
+        
+        // 导出配置到文件
+        if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK && data != null) {
+            try {
+                Uri uri = data.getData();
+                java.io.OutputStream os = getContentResolver().openOutputStream(uri);
+                if (os != null) {
+                    os.write(exportConfigData.getBytes());
+                    os.close();
+                    Toast.makeText(this, "✅ 配置已导出!", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "❌ 导出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
+        
+        // 从文件导入配置
+        if (requestCode == REQUEST_IMPORT && resultCode == RESULT_OK && data != null) {
+            try {
+                Uri uri = data.getData();
+                java.io.InputStream is = getContentResolver().openInputStream(uri);
+                if (is != null) {
+                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+                    is.close();
+                    
+                    JSONObject config = new JSONObject(sb.toString());
+                    
+                    // 确认导入
+                    new AlertDialog.Builder(this)
+                        .setTitle("📥 确认导入")
+                        .setMessage("将导入以下配置:\n\n• 服务器列表\n• 当前服务器\n• 超时设置\n• 服务器类型\n\n⚠️ 这将直接覆盖现有服务器配置，是否继续？")
+                        .setPositiveButton("覆盖导入", (dialog, which) -> {
+                            try {
+                                applyImportedConfig(config);
+                                Toast.makeText(this, "✅ 配置导入成功！\n请重启应用以生效", Toast.LENGTH_LONG).show();
+                            } catch (Exception e) {
+                                Toast.makeText(this, "❌ 导入失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "❌ 读取失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -836,38 +893,38 @@ public class SettingsActivity extends Activity {
         }
     }
     
-    // 导出配置到文件
+    // 导出配置到文件（只导出服务器基础参数）
     private void exportConfig() {
         try {
             JSONObject config = new JSONObject();
             
-            // 导出所有配置项
-            Map<String, ?> allPrefs = prefs.getAll();
-            for (Map.Entry<String, ?> entry : allPrefs.entrySet()) {
-                String key = entry.getKey();
-                Object value = entry.getValue();
-                if (value instanceof String) {
-                    config.put(key, (String) value);
-                } else if (value instanceof Integer) {
-                    config.put(key, (Integer) value);
-                } else if (value instanceof Boolean) {
-                    config.put(key, (Boolean) value);
-                } else if (value instanceof Long) {
-                    config.put(key, (Long) value);
-                } else if (value instanceof Float) {
-                    config.put(key, (Float) value);
+            // 只导出服务器相关的基础参数
+            String[] serverKeys = {
+                "saved_servers",
+                "current_server_name", 
+                "server_url",
+                "auth_token",
+                "connect_timeout",
+                "read_timeout",
+                "server_type"
+            };
+            
+            for (String key : serverKeys) {
+                String value = prefs.getString(key, null);
+                if (value != null) {
+                    config.put(key, value);
                 }
             }
             
             // 添加版本标记
-            config.put("_export_version", "ChatApp v3.3");
+            config.put("_export_version", "ChatApp v3.4");
             config.put("_export_time", System.currentTimeMillis());
             
             // 使用 SAF 创建文件
             android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
             intent.setType("application/json");
-            intent.putExtra(android.content.Intent.EXTRA_TITLE, "chatapp_config.json");
+            intent.putExtra(android.content.Intent.EXTRA_TITLE, "chatapp_servers.json");
             exportConfigData = config.toString(2);
             startActivityForResult(intent, REQUEST_EXPORT);
             
@@ -887,67 +944,6 @@ public class SettingsActivity extends Activity {
             
         } catch (Exception e) {
             Toast.makeText(this, "❌ 打开文件选择器失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    private static final int REQUEST_EXPORT = 1001;
-    private static final int REQUEST_IMPORT = 1002;
-    private String exportConfigData;
-    
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        
-        if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK && data != null) {
-            // 导出到用户选择的文件
-            try {
-                Uri uri = data.getData();
-                java.io.OutputStream os = getContentResolver().openOutputStream(uri);
-                if (os != null) {
-                    os.write(exportConfigData.getBytes());
-                    os.close();
-                    Toast.makeText(this, "✅ 配置已导出!", Toast.LENGTH_SHORT).show();
-                }
-            } catch (Exception e) {
-                Toast.makeText(this, "❌ 导出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        }
-        
-        if (requestCode == REQUEST_IMPORT && resultCode == RESULT_OK && data != null) {
-            // 读取用户选择的文件
-            try {
-                Uri uri = data.getData();
-                java.io.InputStream is = getContentResolver().openInputStream(uri);
-                if (is != null) {
-                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        sb.append(line);
-                    }
-                    reader.close();
-                    is.close();
-                    
-                    JSONObject config = new JSONObject(sb.toString());
-                    
-                    // 确认导入
-                    new AlertDialog.Builder(this)
-                        .setTitle("📥 确认导入")
-                        .setMessage("将导入以下配置:\n\n• 服务器列表\n• 当前服务器\n• 字体大小设置\n• 头像设置\n\n⚠️ 这将覆盖现有配置，是否继续？")
-                        .setPositiveButton("导入", (dialog, which) -> {
-                            try {
-                                applyImportedConfig(config);
-                                Toast.makeText(this, "✅ 配置导入成功！\n请重启应用以生效", Toast.LENGTH_LONG).show();
-                            } catch (Exception e) {
-                                Toast.makeText(this, "❌ 导入失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                            }
-                        })
-                        .setNegativeButton("取消", null)
-                        .show();
-                }
-            } catch (Exception e) {
-                Toast.makeText(this, "❌ 读取失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
         }
     }
     
