@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#1a1a2e">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="💬 云头转向 AI 助手"
+        android:textSize="20sp"
+        android:textColor="#fff"
+        android:padding="10dp"
+        android:background="#16213e"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="10dp">
+        
+        <TextView
+            android:id="@+id/chatView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#eee"
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp"/>
+            
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="10dp">
+        
+        <EditText
+            android:id="@+id/inputMessage"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="输入消息..."
+            android:textColor="#fff"
+            android:textColorHint="#888"
+            android:background="#16213e"
+            android:padding="12dp"/>
+        
+        <Button
+            android:id="@+id/sendButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="发送"
+            android:layout_marginStart="8dp"
+            android:background="#0f3460"
+            android:textColor="#fff"/>
+            
+    </LinearLayout>
+</LinearLayout>
