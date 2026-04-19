@@ -328,7 +328,7 @@ public class ChatActivity extends Activity {
             public void run() {
                 inputText.requestFocus();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                imm.showSoftInput(inputText, InputMethodManager.SHOW_IMPLICIT);
+                imm.showSoftInput(inputText, InputMethodManager.SHOW_FORCED);
             }
         }, 300);
         
