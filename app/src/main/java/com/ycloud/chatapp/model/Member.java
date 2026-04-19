@@ -96,15 +96,19 @@ public class Member {
     // JSON 序列化
     public JSONObject toJSON() {
         JSONObject obj = new JSONObject();
-        obj.put("name", name);
-        obj.put("server", server);
-        obj.put("token", token);
-        obj.put("avatar", avatar);
-        obj.put("avatar_image", avatarImage);
-        obj.put("server_type", serverType);
-        obj.put("connect_timeout", connectTimeout);
-        obj.put("read_timeout", readTimeout);
-        obj.put("intro", intro != null ? intro : "");
+        try {
+            obj.put("name", name);
+            obj.put("server", server);
+            obj.put("token", token);
+            obj.put("avatar", avatar);
+            obj.put("avatar_image", avatarImage);
+            obj.put("server_type", serverType);
+            obj.put("connect_timeout", connectTimeout);
+            obj.put("read_timeout", readTimeout);
+            obj.put("intro", intro != null ? intro : "");
+        } catch (org.json.JSONException e) {
+            e.printStackTrace();
+        }
         return obj;
     }
 
