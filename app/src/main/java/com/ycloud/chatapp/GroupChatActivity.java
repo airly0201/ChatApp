@@ -196,7 +196,6 @@ public class GroupChatActivity extends Activity {
         input.setLayoutParams(new LinearLayout.LayoutParams(0, 
             LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         input.setPadding(16, 12, 16, 12);
-        input.setBackgroundResource(android.R.drawable/edit_text);
         
         sendBtn = new Button(this);
         sendBtn.setText("发送");

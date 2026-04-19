@@ -62,24 +62,28 @@ public class Group {
     // JSON 序列化
     public JSONObject toJSON() {
         JSONObject obj = new JSONObject();
-        obj.put("id", id);
-        obj.put("name", name);
-        obj.put("created_at", createdAt);
-        obj.put("mode", mode);
-        obj.put("host_name", hostName != null ? hostName : "");
-        obj.put("rules", rules != null ? rules : "");
-        
-        JSONArray membersArr = new JSONArray();
-        for (Member m : members) {
-            membersArr.put(m.toJSON());
+        try {
+            obj.put("id", id);
+            obj.put("name", name);
+            obj.put("created_at", createdAt);
+            obj.put("mode", mode);
+            obj.put("host_name", hostName != null ? hostName : "");
+            obj.put("rules", rules != null ? rules : "");
+            
+            JSONArray membersArr = new JSONArray();
+            for (Member m : members) {
+                membersArr.put(m.toJSON());
+            }
+            obj.put("members", membersArr);
+            
+            JSONObject introsObj = new JSONObject();
+            for (Map.Entry<String, String> entry : introductions.entrySet()) {
+                introsObj.put(entry.getKey(), entry.getValue());
+            }
+            obj.put("introductions", introsObj);
+        } catch (org.json.JSONException e) {
+            e.printStackTrace();
         }
-        obj.put("members", membersArr);
-        
-        JSONObject introsObj = new JSONObject();
-        for (Map.Entry<String, String> entry : introductions.entrySet()) {
-            introsObj.put(entry.getKey(), entry.getValue());
-        }
-        obj.put("introductions", introsObj);
         
         return obj;
     }
