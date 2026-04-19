@@ -448,9 +448,10 @@ public class SettingsActivity extends Activity {
         if (editingServerName == null) {
             LinearLayout exportImportLayout = new LinearLayout(this);
             exportImportLayout.setOrientation(LinearLayout.HORIZONTAL);
-            exportImportLayout.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            exportImportLayout.setTopMargin(20);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = 20;
+            exportImportLayout.setLayoutParams(lp);
             
             // 导出按钮
             Button exportBtn = new Button(this);
