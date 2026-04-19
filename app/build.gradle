@@ -10,13 +10,23 @@ android {
         applicationId "com.ycloud.chatapp"
         minSdk 24
         targetSdk 34
-        versionCode 4
-        versionName "3.2"
+        versionCode 5
+        versionName "3.3"
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('chatapp-release.keystore')
+            storePassword 'chatapp123'
+            keyAlias 'chatapp'
+            keyPassword 'chatapp123'
         }
     }
     
