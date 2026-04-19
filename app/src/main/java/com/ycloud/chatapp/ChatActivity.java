@@ -622,9 +622,14 @@ public class ChatActivity extends Activity {
         TextView metaView = new TextView(this);
         metaView.setText(sender + "  " + time);
         metaView.setTextSize(TypedValue.COMPLEX_UNIT_SP, chatTextSize - 3);
-        metaView.setTextColor(Color.rgb(102, 119, 129));
         metaView.setGravity(Gravity.CENTER);
         metaView.setPadding(0, 8, 0, 8);
+        // 调试消息用不同的颜色
+        if (sender.startsWith("🔧")) {
+            metaView.setTextColor(Color.rgb(255, 152, 0));  // 橙色
+        } else {
+            metaView.setTextColor(Color.rgb(102, 119, 129));
+        }
         msgContainer.addView(metaView);
         
         TextView bubble = new TextView(this);
@@ -708,6 +713,14 @@ public class ChatActivity extends Activity {
     }
     
     private void sendMessage(final String content) {
+        // 调试命令：输入 /debug 显示当前配置信息
+        if (content != null && content.trim().equals("/debug")) {
+            String debugInfo = "【当前配置】\n服务器: " + serverUrl + "\n模型: " + getModelName() + "\nToken: " + (authToken != null && authToken.length() > 8 ? authToken.substring(0, 8) + "..." : authToken) + "\n连接超时: " + connectTimeout/1000 + "秒\n读取超时: " + readTimeout/1000 + "秒";
+            String time = new java.text.SimpleDateFormat("HH:mm").format(new java.util.Date());
+            addMessage("🔧调试", debugInfo, time);
+            return;
+        }
+        
         isSending = true;
         savePendingMessage(content);
         
@@ -755,6 +768,7 @@ public class ChatActivity extends Activity {
                     
                     final int responseCode = conn.getResponseCode();
                     final String currentTime = timeFormat.format(new Date());
+                    final String debugStr = "服务器: " + serverUrl + "\n模型: " + getModelName() + "\nToken: " + (authToken != null && authToken.length() > 8 ? authToken.substring(0, 8) + "..." : authToken) + "\n响应码: " + responseCode;
                     
                     if (responseCode == 200) {
                         BufferedReader br = new BufferedReader(
@@ -780,6 +794,7 @@ public class ChatActivity extends Activity {
                                 isSending = false;
                                 chatContainer.removeView(loading);
                                 addMessage("助手", reply, currentTime);
+                                addMessage("🔧调试", debugStr, currentTime);
                             }
                         });
                     } else {
@@ -917,6 +932,7 @@ public class ChatActivity extends Activity {
                     
                     final int responseCode = conn.getResponseCode();
                     final String currentTime = timeFormat.format(new Date());
+                    final String debugStr = "服务器: " + serverUrl + "\n模型: " + getModelName() + "\nToken: " + (authToken != null && authToken.length() > 8 ? authToken.substring(0, 8) + "..." : authToken) + "\n响应码: " + responseCode;
                     
                     if (responseCode == 200) {
                         BufferedReader br = new BufferedReader(
@@ -1049,6 +1065,7 @@ public class ChatActivity extends Activity {
                     
                     final int responseCode = conn.getResponseCode();
                     final String currentTime = timeFormat.format(new Date());
+                    final String debugStr = "服务器: " + serverUrl + "\n模型: " + getModelName() + "\nToken: " + (authToken != null && authToken.length() > 8 ? authToken.substring(0, 8) + "..." : authToken) + "\n响应码: " + responseCode;
                     
                     if (responseCode == 200) {
                         BufferedReader br = new BufferedReader(
