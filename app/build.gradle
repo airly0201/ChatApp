@@ -14,19 +14,19 @@ android {
         versionName "3.3"
     }
 
-    buildTypes {
-        release {
-            minifyEnabled false
-            signingConfig signingConfigs.release
-        }
-    }
-
     signingConfigs {
         release {
             storeFile file('chatapp-release.keystore')
             storePassword 'chatapp123'
             keyAlias 'chatapp'
             keyPassword 'chatapp123'
+        }
+    }
+    
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
         }
     }
     
