@@ -863,63 +863,91 @@ public class SettingsActivity extends Activity {
             config.put("_export_version", "ChatApp v3.3");
             config.put("_export_time", System.currentTimeMillis());
             
-            // 保存到外部存储
-            File exportFile = new File(getExternalFilesDir(null), "chatapp_config.json");
-            FileWriter writer = new FileWriter(exportFile);
-            writer.write(config.toString(2));
-            writer.close();
-            
-            Toast.makeText(this, "✅ 配置已导出到:\n" + exportFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            // 使用 SAF 创建文件
+            android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            intent.setType("application/json");
+            intent.putExtra(android.content.Intent.EXTRA_TITLE, "chatapp_config.json");
+            exportConfigData = config.toString(2);
+            startActivityForResult(intent, REQUEST_EXPORT);
             
         } catch (Exception e) {
             Toast.makeText(this, "❌ 导出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
     
-    // 从文件导入配置
+    // 导入配置
     private void importConfig() {
         try {
-            // 查找配置文件
-            File exportFile = new File(getExternalFilesDir(null), "chatapp_config.json");
-            
-            if (!exportFile.exists()) {
-                // 尝试在 Downloads 目录查找
-                File downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
-                exportFile = new File(downloadsDir, "chatapp_config.json");
-            }
-            
-            if (!exportFile.exists()) {
-                Toast.makeText(this, "❌ 未找到配置文件\n请确保 chatapp_config.json 在下载目录", Toast.LENGTH_LONG).show();
-                return;
-            }
-            
-            // 读取配置
-            BufferedReader reader = new BufferedReader(new FileReader(exportFile));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            reader.close();
-            
-            JSONObject config = new JSONObject(sb.toString());
-            
-            // 确认导入
-            new AlertDialog.Builder(this)
-                .setTitle("📥 确认导入")
-                .setMessage("将导入以下配置:\n\n• 服务器列表\n• 当前服务器\n• 字体大小设置\n• 头像设置\n\n⚠️ 这将覆盖现有配置，是否继续？")
-                .setPositiveButton("导入", (dialog, which) -> {
-                    try {
-                        applyImportedConfig(config);
-                    } catch (Exception e) {
-                        Toast.makeText(this, "❌ 导入失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+            // 使用 SAF 打开文件
+            android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            intent.setType("application/json");
+            startActivityForResult(intent, REQUEST_IMPORT);
             
         } catch (Exception e) {
-            Toast.makeText(this, "❌ 读取配置失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "❌ 打开文件选择器失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private static final int REQUEST_EXPORT = 1001;
+    private static final int REQUEST_IMPORT = 1002;
+    private String exportConfigData;
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        
+        if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK && data != null) {
+            // 导出到用户选择的文件
+            try {
+                Uri uri = data.getData();
+                java.io.OutputStream os = getContentResolver().openOutputStream(uri);
+                if (os != null) {
+                    os.write(exportConfigData.getBytes());
+                    os.close();
+                    Toast.makeText(this, "✅ 配置已导出!", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "❌ 导出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
+        
+        if (requestCode == REQUEST_IMPORT && resultCode == RESULT_OK && data != null) {
+            // 读取用户选择的文件
+            try {
+                Uri uri = data.getData();
+                java.io.InputStream is = getContentResolver().openInputStream(uri);
+                if (is != null) {
+                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+                    is.close();
+                    
+                    JSONObject config = new JSONObject(sb.toString());
+                    
+                    // 确认导入
+                    new AlertDialog.Builder(this)
+                        .setTitle("📥 确认导入")
+                        .setMessage("将导入以下配置:\n\n• 服务器列表\n• 当前服务器\n• 字体大小设置\n• 头像设置\n\n⚠️ 这将覆盖现有配置，是否继续？")
+                        .setPositiveButton("导入", (dialog, which) -> {
+                            try {
+                                applyImportedConfig(config);
+                                Toast.makeText(this, "✅ 配置导入成功！\n请重启应用以生效", Toast.LENGTH_LONG).show();
+                            } catch (Exception e) {
+                                Toast.makeText(this, "❌ 导入失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "❌ 读取失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
         }
     }
     
