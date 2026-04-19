@@ -9,28 +9,38 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.File;
 
+import com.ycloud.chatapp.model.Group;
+import com.ycloud.chatapp.service.GroupManager;
+import com.ycloud.chatapp.service.MessageStorage;
+
 public class ConversationListActivity extends Activity {
     private LinearLayout listContainer;
+    private LinearLayout tabContainer;
     private SharedPreferences prefs;
     private List<JSONObject> serverList = new ArrayList<>();
+    private List<Group> groupList = new ArrayList<>();
+    private GroupManager groupManager;
+    private MessageStorage messageStorage;
+    
+    private int currentTab = 0;  // 0=单聊, 1=群聊
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
         prefs = getSharedPreferences("chat_settings", MODE_PRIVATE);
+        groupManager = new GroupManager(prefs);
+        messageStorage = new MessageStorage(this);
         
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -43,7 +53,7 @@ public class ConversationListActivity extends Activity {
         topBar.setPadding(24, 48, 24, 24);
         
         TextView title = new TextView(this);
-        title.setText("💬 对话列表");
+        title.setText("💬 对话");
         title.setTextSize(20);
         title.setTextColor(Color.WHITE);
         title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
@@ -54,13 +64,54 @@ public class ConversationListActivity extends Activity {
         addBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startActivity(new Intent(ConversationListActivity.this, SettingsActivity.class));
+                if (currentTab == 0) {
+                    startActivity(new Intent(ConversationListActivity.this, SettingsActivity.class));
+                } else {
+                    startActivity(new Intent(ConversationListActivity.this, GroupCreateActivity.class));
+                }
             }
         });
         
         topBar.addView(title);
         topBar.addView(addBtn);
         layout.addView(topBar);
+        
+        // Tab 切换
+        tabContainer = new LinearLayout(this);
+        tabContainer.setOrientation(LinearLayout.HORIZONTAL);
+        tabContainer.setPadding(16, 16, 16, 8);
+        
+        // 单聊 Tab
+        Button tabSingle = new Button(this);
+        tabSingle.setText("👤 单聊");
+        tabSingle.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        tabSingle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                currentTab = 0;
+                updateTabStyle();
+                loadServers();
+                displayList();
+            }
+        });
+        
+        // 群聊 Tab
+        Button tabGroup = new Button(this);
+        tabGroup.setText("👥 群聊");
+        tabGroup.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        tabGroup.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                currentTab = 1;
+                updateTabStyle();
+                loadGroups();
+                displayList();
+            }
+        });
+        
+        tabContainer.addView(tabSingle);
+        tabContainer.addView(tabGroup);
+        layout.addView(tabContainer);
         
         // 列表
         listContainer = new LinearLayout(this);
@@ -70,15 +121,41 @@ public class ConversationListActivity extends Activity {
         
         setContentView(layout);
         
+        updateTabStyle();
         loadServers();
+        loadGroups();
         displayList();
+    }
+    
+    private void updateTabStyle() {
+        if (tabContainer.getChildCount() >= 2) {
+            Button tabSingle = (Button) tabContainer.getChildAt(0);
+            Button tabGroup = (Button) tabContainer.getChildAt(1);
+            
+            if (currentTab == 0) {
+                tabSingle.setBackgroundColor(Color.parseColor("#2196F3"));
+                tabSingle.setTextColor(Color.WHITE);
+                tabGroup.setBackgroundColor(Color.parseColor("#E0E0E0"));
+                tabGroup.setTextColor(Color.BLACK);
+            } else {
+                tabSingle.setBackgroundColor(Color.parseColor("#E0E0E0"));
+                tabSingle.setTextColor(Color.BLACK);
+                tabGroup.setBackgroundColor(Color.parseColor("#2196F3"));
+                tabGroup.setTextColor(Color.WHITE);
+            }
+        }
     }
     
     @Override
     protected void onResume() {
         super.onResume();
         loadServers();
+        loadGroups();
         displayList();
+    }
+    
+    private void loadGroups() {
+        groupList = groupManager.getAllGroups();
     }
     
     private void loadServers() {
@@ -111,6 +188,7 @@ public class ConversationListActivity extends Activity {
                     obj.put("token", currentToken);
                     obj.put("avatar", currentAvatar);
                     obj.put("avatar_image", currentAvatarImage);
+                    obj.put("server_type", prefs.getString("server_type", "openclaw"));
                     serverList.add(0, obj);
                 }
             }
@@ -120,9 +198,17 @@ public class ConversationListActivity extends Activity {
     private void displayList() {
         listContainer.removeAllViews();
         
+        if (currentTab == 0) {
+            displayServerList();
+        } else {
+            displayGroupList();
+        }
+    }
+    
+    private void displayServerList() {
         if (serverList.isEmpty()) {
             TextView empty = new TextView(this);
-            empty.setText("暂无对话\n\n点击右上角 + 添加服务器");
+            empty.setText("暂无单聊\n\n点击右上角 + 添加服务器");
             empty.setTextSize(16);
             empty.setTextColor(Color.GRAY);
             empty.setGravity(android.view.Gravity.CENTER);
@@ -139,10 +225,9 @@ public class ConversationListActivity extends Activity {
                 final String avatar = server.optString("avatar", "🤖");
                 final String avatarImage = server.optString("avatar_image", "");
                 
-                // 检查历史消息
                 String safeName = name.replaceAll("[^a-zA-Z0-9]", "_");
                 File historyFile = new File(getFilesDir(), "chat_history_" + safeName + ".json");
-                String lastMsg = "";
+                String lastMsg = "暂无消息";
                 if (historyFile.exists()) {
                     try {
                         java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(historyFile));
@@ -159,60 +244,7 @@ public class ConversationListActivity extends Activity {
                     } catch (Exception e) {}
                 }
                 
-                LinearLayout item = new LinearLayout(this);
-                item.setOrientation(LinearLayout.HORIZONTAL);
-                item.setBackgroundColor(Color.WHITE);
-                item.setPadding(20, 20, 20, 20);
-                android.view.ViewGroup.MarginLayoutParams params = 
-                    new android.view.ViewGroup.MarginLayoutParams(
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
-                params.bottomMargin = 12;
-                item.setLayoutParams(params);
-                
-                // 头像显示
-                if (!avatarImage.isEmpty()) {
-                    // 显示自定义头像图片
-                    ImageView avatarImgView = new ImageView(this);
-                    avatarImgView.setLayoutParams(new LinearLayout.LayoutParams(100, 100));
-                    avatarImgView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                    
-                    File avatarFile = new File(getFilesDir(), avatarImage);
-                    if (avatarFile.exists()) {
-                        Bitmap bmp = BitmapFactory.decodeFile(avatarFile.getAbsolutePath());
-                        avatarImgView.setImageBitmap(bmp);
-                    }
-                    item.addView(avatarImgView);
-                } else {
-                    // 显示emoji头像
-                    TextView avatarView = new TextView(this);
-                    avatarView.setText(avatar);
-                    avatarView.setTextSize(36);
-                    avatarView.setPadding(0, 0, 16, 0);
-                    item.addView(avatarView);
-                }
-                
-                // 文字
-                LinearLayout textLayout = new LinearLayout(this);
-                textLayout.setOrientation(LinearLayout.VERTICAL);
-                textLayout.setLayoutParams(new LinearLayout.LayoutParams(0, 
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-                
-                TextView nameView = new TextView(this);
-                nameView.setText(name);
-                nameView.setTextSize(16);
-                nameView.setTextColor(Color.parseColor("#1A1A1A"));
-                textLayout.addView(nameView);
-                
-                TextView msgView = new TextView(this);
-                msgView.setText(lastMsg.isEmpty() ? "暂无消息" : lastMsg);
-                msgView.setTextSize(14);
-                msgView.setTextColor(Color.GRAY);
-                textLayout.addView(msgView);
-                
-                item.addView(textLayout);
-                
-                item.setOnClickListener(new View.OnClickListener() {
+                addListItem(true, avatar, avatarImage, name, lastMsg, new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         prefs.edit()
@@ -231,11 +263,117 @@ public class ConversationListActivity extends Activity {
                         intent.putExtra("avatar_image", avatarImage);
                         startActivity(intent);
                     }
-                });
-                
-                listContainer.addView(item);
-                
+                }, null);
             } catch (Exception e) {}
         }
+    }
+    
+    private void displayGroupList() {
+        if (groupList.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("暂无群聊\n\n点击右上角 + 创建群聊");
+            empty.setTextSize(16);
+            empty.setTextColor(Color.GRAY);
+            empty.setGravity(android.view.Gravity.CENTER);
+            empty.setPadding(0, 100, 0, 100);
+            listContainer.addView(empty);
+            return;
+        }
+        
+        for (final Group group : groupList) {
+            int memberCount = group.getMembers().size();
+            String memberInfo = memberCount + "人 · " + group.getModeName();
+            
+            // 获取最后一条消息
+            String lastMsg = "暂无消息";
+            List<com.ycloud.chatapp.model.Message> history = messageStorage.loadHistory(group.getId());
+            if (!history.isEmpty()) {
+                com.ycloud.chatapp.model.Message last = history.get(history.size() - 1);
+                lastMsg = last.getContent();
+                if (lastMsg.length() > 30) lastMsg = lastMsg.substring(0, 30) + "...";
+            }
+            
+            addListItem(false, "👥", "", group.getName(), lastMsg, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(ConversationListActivity.this, GroupChatActivity.class);
+                    intent.putExtra("group_id", group.getId());
+                    startActivity(intent);
+                }
+            }, new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    // 长按删除群组
+                    groupManager.deleteGroup(group.getId());
+                    messageStorage.deleteHistory(group.getId());
+                    loadGroups();
+                    displayList();
+                    return true;
+                }
+            });
+        }
+    }
+    
+    private void addListItem(boolean isSingle, String avatar, String avatarImage, 
+                            String title, String subtitle, 
+                            View.OnClickListener clickListener,
+                            View.OnLongClickListener longClickListener) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.HORIZONTAL);
+        item.setBackgroundColor(Color.WHITE);
+        item.setPadding(20, 20, 20, 20);
+        android.view.ViewGroup.MarginLayoutParams params = 
+            new android.view.ViewGroup.MarginLayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = 12;
+        item.setLayoutParams(params);
+        
+        // 头像
+        if (!avatarImage.isEmpty()) {
+            ImageView avatarImgView = new ImageView(this);
+            avatarImgView.setLayoutParams(new LinearLayout.LayoutParams(100, 100));
+            avatarImgView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            File avatarFile = new File(getFilesDir(), avatarImage);
+            if (avatarFile.exists()) {
+                Bitmap bmp = BitmapFactory.decodeFile(avatarFile.getAbsolutePath());
+                avatarImgView.setImageBitmap(bmp);
+            }
+            item.addView(avatarImgView);
+        } else {
+            TextView avatarView = new TextView(this);
+            avatarView.setText(avatar);
+            avatarView.setTextSize(36);
+            avatarView.setPadding(0, 0, 16, 0);
+            item.addView(avatarView);
+        }
+        
+        // 文字
+        LinearLayout textLayout = new LinearLayout(this);
+        textLayout.setOrientation(LinearLayout.VERTICAL);
+        textLayout.setLayoutParams(new LinearLayout.LayoutParams(0, 
+            LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextSize(16);
+        titleView.setTextColor(Color.parseColor("#1A1A1A"));
+        textLayout.addView(titleView);
+        
+        TextView msgView = new TextView(this);
+        msgView.setText(subtitle);
+        msgView.setTextSize(14);
+        msgView.setTextColor(Color.GRAY);
+        textLayout.addView(msgView);
+        
+        item.addView(textLayout);
+        
+        item.setOnClickListener(clickListener);
+        
+        if (longClickListener != null) {
+            item.setOnLongClickListener(longClickListener);
+        }
+        
+        listContainer.addView(item);
     }
 }

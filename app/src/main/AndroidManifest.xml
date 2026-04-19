@@ -35,5 +35,15 @@
             android:exported="false"
             android:label="服务器设置"/>
         
+        <activity
+            android:name=".GroupCreateActivity"
+            android:exported="false"
+            android:label="创建群聊"/>
+        
+        <activity
+            android:name=".GroupChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustPan"/>
+        
     </application>
 </manifest>
