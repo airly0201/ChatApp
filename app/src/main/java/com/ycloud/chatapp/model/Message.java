@@ -59,11 +59,15 @@ public class Message {
     // JSON 序列化
     public JSONObject toJSON() {
         JSONObject obj = new JSONObject();
-        obj.put("sender", sender);
-        obj.put("content", content);
-        obj.put("time", time);
-        if (avatar != null) {
-            obj.put("avatar", avatar);
+        try {
+            obj.put("sender", sender);
+            obj.put("content", content);
+            obj.put("time", time);
+            if (avatar != null) {
+                obj.put("avatar", avatar);
+            }
+        } catch (org.json.JSONException e) {
+            e.printStackTrace();
         }
         return obj;
     }
@@ -81,9 +85,13 @@ public class Message {
     // 转换为 API 消息格式
     public JSONObject toAPIMessage() {
         JSONObject obj = new JSONObject();
-        String role = isUserMessage() ? "user" : "assistant";
-        obj.put("role", role);
-        obj.put("content", content);
+        try {
+            String role = isUserMessage() ? "user" : "assistant";
+            obj.put("role", role);
+            obj.put("content", content);
+        } catch (org.json.JSONException e) {
+            e.printStackTrace();
+        }
         return obj;
     }
 
