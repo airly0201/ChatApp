@@ -312,54 +312,60 @@ public class GroupChatActivity extends Activity {
         
         // 调用助手
                 updateDebugPanel("等待响应...");
-                new Thread(new Runnable() {
+new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        try {
-                            List<Message> responses;
-                            String modeName = group.getModeName();
-                            Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息数: " + messages.size());
-                            
-                            switch (group.getMode()) {
+                        // 必须初始化为 final（effectively final）
+                        final List<Message> responses;
+                        String modeName = group.getModeName();
+                        Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息数: " + messages.size());
+                        
+                        switch (group.getMode()) {
                         case 1: // 用户主持 - @指定某个助手
                             Logger.i("GroupChatActivity", "用户主持模式: 解析@指定的助手");
-                            // 先初始化 responses 列表
-                            responses = new ArrayList<>();
+                            // 创建新的列表
+                            List<Message> case1Responses = new ArrayList<>();
                             // 解析 @ 提及的助手
                             Member targetMember = parseMentionedMember(content);
                             if (targetMember != null) {
                                 Logger.i("GroupChatActivity", "发送给指定助手: " + targetMember.getName());
                                 Message singleResponse = dispatcher.sendToMember(targetMember, group, content, messages, promptBuilder);
-                                responses.add(singleResponse);
+                                case1Responses.add(singleResponse);
                             } else if (!content.contains("@")) {
                                 // 没有@时，提示用户需要@指定
-                                responses.add(new Message("系统", "请使用 @ 符号指定要回覆的助手，例如: @助手名称 你的问题"));
+                                case1Responses.add(new Message("系统", "请使用 @ 符号指定要回覆的助手，例如: @助手名称 你的问题"));
                             } else {
-                                responses.add(new Message("系统", "未找到指定的助手，请检查名称是否正确"));
+                                case1Responses.add(new Message("系统", "未找到指定的助手，请检查名称是否正确"));
                             }
+                            responses = case1Responses;
                             break;
                             
                         case 2: // 助手主持 - 协调模式
                             Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
-                            responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
-                            if (responses == null) {
+                            List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
+                            if (case2Responses == null) {
                                 Logger.w("GroupChatActivity", "coordinateGroup 返回 null，初始化为空列表");
-                                responses = new ArrayList<>();
+                                case2Responses = new ArrayList<>();
                             }
+                            responses = case2Responses;
                             break;
                             
                         case 0: // 平等讨论（默认）
                         default:
                             Logger.i("GroupChatActivity", "广播消息到所有成员");
-                            responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
-                            if (responses == null) {
+                            List<Message> case0Responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
+                            if (case0Responses == null) {
                                 Logger.w("GroupChatActivity", "broadcast 返回 null，初始化为空列表");
-                                responses = new ArrayList<>();
+                                case0Responses = new ArrayList<>();
                             }
+                            responses = case0Responses;
                             break;
-                    }
+                        }
                     
                     Logger.i("GroupChatActivity", "收到响应数: " + responses.size());
+                    
+                    // 创建 final 副本供内部类使用
+                    final List<Message> finalResponses = responses;
                     
                     // 添加响应到历史
                     for (Message response : responses) {
@@ -371,7 +377,7 @@ public class GroupChatActivity extends Activity {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            for (Message response : responses) {
+                            for (Message response : finalResponses) {
                                 displaySingleMessage(response);
                             }
                             scrollToBottom();
