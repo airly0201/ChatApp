@@ -97,6 +97,81 @@ public class MemberDispatcher {
         
         return sendToMember(host, group, message, history, promptBuilder);
     }
+    
+    /**
+     * 协调模式：主持人先响应，然后可以调度其他助手补充
+     * 实现真正的多助手协作
+     */
+    public List<Message> coordinateGroup(Group group, String message, List<Message> history,
+                                          PromptBuilder promptBuilder) {
+        Logger.i("MemberDispatcher", "coordinateGroup: 开始协调");
+        List<Message> responses = new ArrayList<>();
+        
+        // 1. 先调用主持人
+        Message hostResponse = sendToHost(group, message, history, promptBuilder);
+        responses.add(hostResponse);
+        Logger.i("MemberDispatcher", "主持人响应: " + hostResponse.getContent().substring(0, Math.min(50, hostResponse.getContent().length())));
+        
+        // 2. 更新历史，加入主持人响应
+        List<Message> updatedHistory = new ArrayList<>(history);
+        updatedHistory.addAll(responses);
+        
+        // 3. 检查主持人响应中是否明确要求其他助手参与
+        String hostContent = hostResponse.getContent().toLowerCase();
+        boolean needsCoordination = containsCoordinationSignal(hostContent);
+        
+        if (needsCoordination) {
+            Logger.i("MemberDispatcher", "主持人请求其他助手参与");
+            // 4. 调用其他助手补充
+            List<Member> otherMembers = new ArrayList<>();
+            for (Member m : group.getMembers()) {
+                if (!m.getName().equals(group.getHostName())) {
+                    otherMembers.add(m);
+                }
+            }
+            
+            // 并行调用其他助手
+            for (Member member : otherMembers) {
+                try {
+                    Logger.i("MemberDispatcher", "调用助手: " + member.getName());
+                    Message memberResponse = sendToMember(member, group, message, updatedHistory, promptBuilder);
+                    responses.add(memberResponse);
+                } catch (Exception e) {
+                    Logger.e("MemberDispatcher", "调用助手失败 " + member.getName() + ": " + e.getMessage());
+                }
+            }
+        } else {
+            // 主持人没有明确要求时，其他助手也可以主动补充
+            Logger.i("MemberDispatcher", "其他助手主动补充");
+            for (Member m : group.getMembers()) {
+                if (!m.getName().equals(group.getHostName())) {
+                    // 简短提示，让其他助手补充
+                    String followUp = "主持人已回复: " + hostResponse.getContent().substring(0, Math.min(100, hostResponse.getContent().length()));
+                    try {
+                        Message memberResponse = sendToMember(m, group, followUp, updatedHistory, promptBuilder);
+                        responses.add(memberResponse);
+                    } catch (Exception e) {
+                        Logger.e("MemberDispatcher", "助手补充失败: " + e.getMessage());
+                    }
+                }
+            }
+        }
+        
+        return responses;
+    }
+    
+    /**
+     * 检查响应中是否包含协调信号（明确要求其他助手）
+     */
+    private boolean containsCoordinationSignal(String content) {
+        String[] signals = {"调用", "请求", "请", "需要", "@", "助手", "协调", "分工", "分工协作"};
+        for (String signal : signals) {
+            if (content.contains(signal)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * 获取自我介绍

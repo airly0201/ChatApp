@@ -308,11 +308,9 @@ public class GroupChatActivity extends Activity {
                             responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
                             break;
                             
-                        case 2: // 助手主持
-                            Logger.i("GroupChatActivity", "发送给主持人: " + group.getHostName());
-                            Message hostResponse = dispatcher.sendToHost(group, content, messages, promptBuilder);
-                            responses = new ArrayList<>();
-                            responses.add(hostResponse);
+                        case 2: // 助手主持 - 协调模式
+                            Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
+                            responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
                             break;
                             
                         case 0: // 平等讨论（默认）
