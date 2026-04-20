@@ -311,12 +311,12 @@ public class GroupChatActivity extends Activity {
         scrollToBottom();
         
         // 调用助手
-                updateDebugPanel("等待响应...");
-new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        // 必须初始化为 final（effectively final）
-                        final List<Message> responses;
+        updateDebugPanel("等待响应...");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                // 必须初始化为 final（effectively final）
+                final List<Message> responses;
                         String modeName = group.getModeName();
                         Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息数: " + messages.size());
                         
