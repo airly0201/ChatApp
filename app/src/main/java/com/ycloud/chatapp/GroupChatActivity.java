@@ -244,17 +244,7 @@ public class GroupChatActivity extends Activity {
             
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                String text = s.toString();
-                int lastAt = text.lastIndexOf('@', start + count - 1);
-                if (lastAt >= 0) {
-                    // 检查@后面是否还有空格或已结束
-                    String afterAt = text.substring(lastAt + 1);
-                    if (!afterAt.contains(" ") && !afterAt.isEmpty()) {
-                        atPosition = lastAt;
-                    } else if (afterAt.isEmpty()) {
-                        atPosition = lastAt;
-                    }
-                }
+                // 不在 beforeTextChanged 中处理，留给 afterTextChanged
             }
             
             @Override
@@ -268,17 +258,22 @@ public class GroupChatActivity extends Activity {
                 // 检查是否在@后面输入
                 if (atPosition >= 0 && atPosition < text.length()) {
                     String afterAt = text.substring(atPosition + 1);
-                    // 如果用户输入了空格或@结束，显示助手列表
-                    if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
+                    // 如果用户输入了非空字符（不是空格），立即显示助手列表
+                    if (!afterAt.isEmpty() && !afterAt.startsWith(" ")) {
+                        showMemberPopup(input, atPosition);
+                        atPosition = -1;
+                    } else if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
+                        // 如果是空格或空，也显示
                         showMemberPopup(input, atPosition);
                         atPosition = -1;
                     }
                 }
                 
-                // 检查新输入的@
+                // 检查新输入的@ - 只要文本中有@且光标在@后面
                 int lastAt = text.lastIndexOf('@');
                 if (lastAt >= 0 && (lastAt == text.length() - 1 || 
-                    text.charAt(lastAt + 1) == ' ' || cursorPos <= lastAt)) {
+                    (lastAt + 1 < text.length() && text.charAt(lastAt + 1) != ' ') ||
+                    cursorPos > lastAt)) {
                     atPosition = lastAt;
                 } else {
                     atPosition = -1;
@@ -324,9 +319,20 @@ public class GroupChatActivity extends Activity {
                     Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size());
                     
                     switch (group.getMode()) {
-                        case 1: // 用户主持
-                            Logger.i("GroupChatActivity", "广播消息到所有成员");
-                            responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
+                        case 1: // 用户主持 - @指定某个助手
+                            Logger.i("GroupChatActivity", "用户主持模式: 解析@指定的助手");
+                            // 解析 @ 提及的助手
+                            Member targetMember = parseMentionedMember(content);
+                            if (targetMember != null) {
+                                Logger.i("GroupChatActivity", "发送给指定助手: " + targetMember.getName());
+                                Message singleResponse = dispatcher.sendToMember(targetMember, group, content, messages, promptBuilder);
+                                responses.add(singleResponse);
+                            } else if (!content.contains("@")) {
+                                // 没有@时，提示用户需要@指定
+                                responses.add(new Message("系统", "请使用 @ 符号指定要回覆的助手，例如: @助手名称 你的问题"));
+                            } else {
+                                responses.add(new Message("系统", "未找到指定的助手，请检查名称是否正确"));
+                            }
                             break;
                             
                         case 2: // 助手主持 - 协调模式
@@ -536,5 +542,43 @@ public class GroupChatActivity extends Activity {
                 debugPanel.setText("🔍 运行状态: " + status);
             }
         });
+    }
+    
+    /**
+     * 解析消息中 @ 提及的成员
+     */
+    private Member parseMentionedMember(String content) {
+        if (group == null || group.getMembers() == null) {
+            return null;
+        }
+        
+        // 查找 @ 符号
+        int atIndex = content.indexOf('@');
+        if (atIndex < 0) {
+            return null;
+        }
+        
+        // 获取 @ 后面的内容（到空格为止）
+        String afterAt = content.substring(atIndex + 1).trim();
+        if (afterAt.isEmpty()) {
+            return null;
+        }
+        
+        // 去除可能的消息内容，只保留被@的名称
+        String[] parts = afterAt.split("\\s+");
+        String mentionedName = parts[0];
+        
+        // 查找匹配的成员
+        for (Member member : group.getMembers()) {
+            if (member.getName().equals(mentionedName)) {
+                return member;
+            }
+            // 也支持模糊匹配（包含关系）
+            if (mentionedName.length() >= 2 && member.getName().contains(mentionedName)) {
+                return member;
+            }
+        }
+        
+        return null;
     }
 }
