@@ -343,8 +343,8 @@ public class GroupChatActivity extends Activity {
                     case 2: // 助手主持 - 协调模式
                         Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
                         List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
+                        // 直接在方法返回时保证不为 null
                         if (case2Responses == null) {
-                            Logger.w("GroupChatActivity", "coordinateGroup 返回 null，初始化为空列表");
                             case2Responses = new ArrayList<>();
                         }
                         responses = case2Responses;
@@ -354,8 +354,8 @@ public class GroupChatActivity extends Activity {
                     default:
                         Logger.i("GroupChatActivity", "广播消息到所有成员");
                         List<Message> case0Responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
+                        // 直接在方法返回时保证不为 null
                         if (case0Responses == null) {
-                            Logger.w("GroupChatActivity", "broadcast 返回 null，初始化为空列表");
                             case0Responses = new ArrayList<>();
                         }
                         responses = case0Responses;
