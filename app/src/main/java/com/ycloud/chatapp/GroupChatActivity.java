@@ -317,88 +317,75 @@ public class GroupChatActivity extends Activity {
             public void run() {
                 // 必须初始化为 final（effectively final）
                 final List<Message> responses;
-                        String modeName = group.getModeName();
-                        Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息数: " + messages.size());
+                String modeName = group.getModeName();
+                Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息数: " + messages.size());
+                
+                switch (group.getMode()) {
+                    case 1: // 用户主持 - @指定某个助手
+                        Logger.i("GroupChatActivity", "用户主持模式: 解析@指定的助手");
+                        // 创建新的列表
+                        List<Message> case1Responses = new ArrayList<>();
+                        // 解析 @ 提及的助手
+                        Member targetMember = parseMentionedMember(content);
+                        if (targetMember != null) {
+                            Logger.i("GroupChatActivity", "发送给指定助手: " + targetMember.getName());
+                            Message singleResponse = dispatcher.sendToMember(targetMember, group, content, messages, promptBuilder);
+                            case1Responses.add(singleResponse);
+                        } else if (!content.contains("@")) {
+                            // 没有@时，提示用户需要@指定
+                            case1Responses.add(new Message("系统", "请使用 @ 符号指定要回覆的助手，例如: @助手名称 你的问题"));
+                        } else {
+                            case1Responses.add(new Message("系统", "未找到指定的助手，请检查名称是否正确"));
+                        }
+                        responses = case1Responses;
+                        break;
                         
-                        switch (group.getMode()) {
-                        case 1: // 用户主持 - @指定某个助手
-                            Logger.i("GroupChatActivity", "用户主持模式: 解析@指定的助手");
-                            // 创建新的列表
-                            List<Message> case1Responses = new ArrayList<>();
-                            // 解析 @ 提及的助手
-                            Member targetMember = parseMentionedMember(content);
-                            if (targetMember != null) {
-                                Logger.i("GroupChatActivity", "发送给指定助手: " + targetMember.getName());
-                                Message singleResponse = dispatcher.sendToMember(targetMember, group, content, messages, promptBuilder);
-                                case1Responses.add(singleResponse);
-                            } else if (!content.contains("@")) {
-                                // 没有@时，提示用户需要@指定
-                                case1Responses.add(new Message("系统", "请使用 @ 符号指定要回覆的助手，例如: @助手名称 你的问题"));
-                            } else {
-                                case1Responses.add(new Message("系统", "未找到指定的助手，请检查名称是否正确"));
-                            }
-                            responses = case1Responses;
-                            break;
-                            
-                        case 2: // 助手主持 - 协调模式
-                            Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
-                            List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
-                            if (case2Responses == null) {
-                                Logger.w("GroupChatActivity", "coordinateGroup 返回 null，初始化为空列表");
-                                case2Responses = new ArrayList<>();
-                            }
-                            responses = case2Responses;
-                            break;
-                            
-                        case 0: // 平等讨论（默认）
-                        default:
-                            Logger.i("GroupChatActivity", "广播消息到所有成员");
-                            List<Message> case0Responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
-                            if (case0Responses == null) {
-                                Logger.w("GroupChatActivity", "broadcast 返回 null，初始化为空列表");
-                                case0Responses = new ArrayList<>();
-                            }
-                            responses = case0Responses;
-                            break;
+                    case 2: // 助手主持 - 协调模式
+                        Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
+                        List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
+                        if (case2Responses == null) {
+                            Logger.w("GroupChatActivity", "coordinateGroup 返回 null，初始化为空列表");
+                            case2Responses = new ArrayList<>();
                         }
-                    
-                    Logger.i("GroupChatActivity", "收到响应数: " + responses.size());
-                    
-                    // 创建 final 副本供内部类使用
-                    final List<Message> finalResponses = responses;
-                    
-                    // 添加响应到历史
-                    for (Message response : responses) {
-                        messages.add(response);
-                    }
-                    messageStorage.addMessages(groupId, responses);
-                    
-                    // 显示响应
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            for (Message response : finalResponses) {
-                                displaySingleMessage(response);
-                            }
-                            scrollToBottom();
-                            isLoading = false;
-                            sendBtn.setEnabled(true);
+                        responses = case2Responses;
+                        break;
+                        
+                    case 0: // 平等讨论（默认）
+                    default:
+                        Logger.i("GroupChatActivity", "广播消息到所有成员");
+                        List<Message> case0Responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
+                        if (case0Responses == null) {
+                            Logger.w("GroupChatActivity", "broadcast 返回 null，初始化为空列表");
+                            case0Responses = new ArrayList<>();
                         }
-                    });
-                    
-                } catch (final Exception e) {
-                    Logger.e("GroupChatActivity", "调用助手失败: " + e.getMessage());
-                    e.printStackTrace();
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(GroupChatActivity.this, 
-                                "调用失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                            isLoading = false;
-                            sendBtn.setEnabled(true);
-                        }
-                    });
+                        responses = case0Responses;
+                        break;
                 }
+                
+                Logger.i("GroupChatActivity", "收到响应数: " + responses.size());
+                
+                // 创建 final 副本供内部类使用
+                final List<Message> finalResponses = responses;
+                
+                // 添加响应到历史
+                for (Message response : responses) {
+                    messages.add(response);
+                }
+                messageStorage.addMessages(groupId, responses);
+                
+                // 显示响应
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (Message response : finalResponses) {
+                            displaySingleMessage(response);
+                        }
+                        scrollToBottom();
+                        isLoading = false;
+                        sendBtn.setEnabled(true);
+                    }
+                });
+                
             }
         }).start();
     }
