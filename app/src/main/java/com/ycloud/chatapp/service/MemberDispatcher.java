@@ -34,6 +34,11 @@ public class MemberDispatcher {
         List<Message> responses = new ArrayList<>();
         List<Member> members = group.getMembers();
         
+        if (members.isEmpty()) {
+            Logger.w("MemberDispatcher", "成员列表为空！");
+            return responses;
+        }
+        
         // 并行调用所有成员 API
         List<MemberCallTask> tasks = new ArrayList<>();
         for (Member member : members) {
@@ -44,21 +49,27 @@ public class MemberDispatcher {
         try {
             // 执行所有任务
             List<Message> results = executeParallel(tasks);
+            Logger.i("MemberDispatcher", "executeParallel 完成，结果数: " + results.size());
             
             // 按成员顺序添加响应
             for (int i = 0; i < members.size(); i++) {
                 Member member = members.get(i);
-                if (i < results.size() && results.get(i) != null) {
-                    responses.add(results.get(i));
+                Message result = (i < results.size()) ? results.get(i) : null;
+                Logger.i("MemberDispatcher", "成员 " + member.getName() + " 响应: " + (result != null ? "有" : "null"));
+                if (result != null) {
+                    responses.add(result);
+                    Logger.i("MemberDispatcher", "添加响应: " + result.getContent().substring(0, Math.min(30, result.getContent().length())));
                 }
                 if (listener != null) {
                     listener.onProgress(i + 1, members.size());
                 }
             }
         } catch (Exception e) {
+            Logger.e("MemberDispatcher", "broadcast 异常: " + e.getMessage());
             e.printStackTrace();
         }
         
+        Logger.i("MemberDispatcher", "broadcast 完成，总响应数: " + responses.size());
         return responses;
     }
 
@@ -92,6 +103,7 @@ public class MemberDispatcher {
         Logger.i("MemberDispatcher", "sendToHost: 主持人=" + group.getHostName());
         Member host = findMemberByName(group, group.getHostName());
         if (host == null) {
+            Logger.e("MemberDispatcher", "未找到主持人: " + group.getHostName());
             return new Message("系统", "未找到主持人");
         }
         
@@ -104,10 +116,16 @@ public class MemberDispatcher {
      */
     public List<Message> coordinateGroup(Group group, String message, List<Message> history,
                                           PromptBuilder promptBuilder) {
-        Logger.i("MemberDispatcher", "coordinateGroup: 开始协调");
+        Logger.i("MemberDispatcher", "coordinateGroup: 开始协调，成员数=" + group.getMembers().size());
         List<Message> responses = new ArrayList<>();
         
+        if (group.getHostName() == null || group.getHostName().isEmpty()) {
+            Logger.e("MemberDispatcher", "主持人名称为空！");
+            return responses;
+        }
+        
         // 1. 先调用主持人
+        Logger.i("MemberDispatcher", "调用主持人: " + group.getHostName());
         Message hostResponse = sendToHost(group, message, history, promptBuilder);
         responses.add(hostResponse);
         Logger.i("MemberDispatcher", "主持人响应: " + hostResponse.getContent().substring(0, Math.min(50, hostResponse.getContent().length())));
@@ -120,6 +138,8 @@ public class MemberDispatcher {
         String hostContent = hostResponse.getContent().toLowerCase();
         boolean needsCoordination = containsCoordinationSignal(hostContent);
         
+        Logger.i("MemberDispatcher", "需要协调: " + needsCoordination + ", 内容: " + hostContent.substring(0, Math.min(30, hostContent.length())));
+        
         if (needsCoordination) {
             Logger.i("MemberDispatcher", "主持人请求其他助手参与");
             // 4. 调用其他助手补充
@@ -130,12 +150,14 @@ public class MemberDispatcher {
                 }
             }
             
+            Logger.i("MemberDispatcher", "其他助手数: " + otherMembers.size());
             // 并行调用其他助手
             for (Member member : otherMembers) {
                 try {
                     Logger.i("MemberDispatcher", "调用助手: " + member.getName());
                     Message memberResponse = sendToMember(member, group, message, updatedHistory, promptBuilder);
                     responses.add(memberResponse);
+                    Logger.i("MemberDispatcher", "助手 " + member.getName() + " 响应完成");
                 } catch (Exception e) {
                     Logger.e("MemberDispatcher", "调用助手失败 " + member.getName() + ": " + e.getMessage());
                 }
@@ -148,6 +170,7 @@ public class MemberDispatcher {
                     // 简短提示，让其他助手补充
                     String followUp = "主持人已回复: " + hostResponse.getContent().substring(0, Math.min(100, hostResponse.getContent().length()));
                     try {
+                        Logger.i("MemberDispatcher", "调用助手补充: " + m.getName());
                         Message memberResponse = sendToMember(m, group, followUp, updatedHistory, promptBuilder);
                         responses.add(memberResponse);
                     } catch (Exception e) {
@@ -157,6 +180,7 @@ public class MemberDispatcher {
             }
         }
         
+        Logger.i("MemberDispatcher", "coordinateGroup 完成，总响应数: " + responses.size());
         return responses;
     }
     

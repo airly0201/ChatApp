@@ -342,12 +342,20 @@ public class GroupChatActivity extends Activity {
                         case 2: // 助手主持 - 协调模式
                             Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
                             responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
+                            if (responses == null) {
+                                Logger.w("GroupChatActivity", "coordinateGroup 返回 null，初始化为空列表");
+                                responses = new ArrayList<>();
+                            }
                             break;
                             
                         case 0: // 平等讨论（默认）
                         default:
                             Logger.i("GroupChatActivity", "广播消息到所有成员");
                             responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
+                            if (responses == null) {
+                                Logger.w("GroupChatActivity", "broadcast 返回 null，初始化为空列表");
+                                responses = new ArrayList<>();
+                            }
                             break;
                     }
                     
