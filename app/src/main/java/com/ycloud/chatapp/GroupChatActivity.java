@@ -297,6 +297,7 @@ public class GroupChatActivity extends Activity {
         if (content.isEmpty()) return;
         
         Logger.i("GroupChatActivity", "发送消息: " + content);
+        updateDebugPanel("发送中...");
         
         input.setText("");
         isLoading = true;
@@ -310,17 +311,20 @@ public class GroupChatActivity extends Activity {
         scrollToBottom();
         
         // 调用助手
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    List<Message> responses;
-                    String modeName = group.getModeName();
-                    Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size());
-                    
-                    switch (group.getMode()) {
+                updateDebugPanel("等待响应...");
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            List<Message> responses;
+                            String modeName = group.getModeName();
+                            Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息数: " + messages.size());
+                            
+                            switch (group.getMode()) {
                         case 1: // 用户主持 - @指定某个助手
                             Logger.i("GroupChatActivity", "用户主持模式: 解析@指定的助手");
+                            // 先初始化 responses 列表
+                            responses = new ArrayList<>();
                             // 解析 @ 提及的助手
                             Member targetMember = parseMentionedMember(content);
                             if (targetMember != null) {
