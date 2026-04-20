@@ -7,6 +7,9 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -47,6 +50,7 @@ public class GroupChatActivity extends Activity {
     private ScrollView scrollView;
     private Button sendBtn;
     private TextView modeIndicator;
+    private TextView debugPanel;
     
     private Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isLoading = false;
@@ -92,13 +96,16 @@ public class GroupChatActivity extends Activity {
     private void checkAndRequestIntroductions() {
         // 检查是否有成员未自我介绍
         Member needIntro = groupManager.getMemberNeedingIntro(groupId);
+        Logger.i("GroupChatActivity", "checkAndRequestIntroductions: 需要自我介绍的成员=" + (needIntro != null ? needIntro.getName() : "无"));
         if (needIntro != null) {
             // 请求自我介绍
             final Member finalNeedIntro = needIntro;
+            Logger.i("GroupChatActivity", "请求 " + needIntro.getName() + " 自我介绍");
             new Thread(new Runnable() {
                 @Override
                 public void run() {
                     Message introMsg = dispatcher.requestIntroduction(finalNeedIntro, group, promptBuilder);
+                    Logger.i("GroupChatActivity", "收到自我介绍: " + introMsg.getContent().substring(0, Math.min(50, introMsg.getContent().length())));
                     
                     // 保存自我介绍
                     groupManager.updateIntroduction(groupId, finalNeedIntro.getName(), introMsg.getContent());
@@ -215,7 +222,21 @@ public class GroupChatActivity extends Activity {
         inputBar.addView(sendBtn);
         layout.addView(inputBar);
         
+        // 调试面板 - 显示运行状态
+        TextView debugPanel = new TextView(this);
+        debugPanel.setText("🔍 运行状态: 初始化中...");
+        debugPanel.setTextSize(12);
+        debugPanel.setTextColor(Color.DKGRAY);
+        debugPanel.setBackgroundColor(Color.parseColor("#FFF3CD"));
+        debugPanel.setPadding(16, 8, 16, 8);
+        debugPanel.setId(View.generateViewId());
+        layout.addView(debugPanel);
+        
         setContentView(layout);
+        
+        // 保存调试面板引用
+        this.debugPanel = debugPanel;
+        updateDebugPanel("就绪");
         
         // 监听 @ 提及
         input.addTextChangedListener(new TextWatcher() {
