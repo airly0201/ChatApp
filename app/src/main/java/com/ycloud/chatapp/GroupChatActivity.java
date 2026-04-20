@@ -527,4 +527,14 @@ public class GroupChatActivity extends Activity {
             }
         });
     }
+    
+    private void updateDebugPanel(final String status) {
+        if (debugPanel == null) return;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                debugPanel.setText("🔍 运行状态: " + status);
+            }
+        });
+    }
 }
