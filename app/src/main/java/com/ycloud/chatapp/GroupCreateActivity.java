@@ -22,6 +22,7 @@ import java.util.List;
 import com.ycloud.chatapp.model.Group;
 import com.ycloud.chatapp.model.Member;
 import com.ycloud.chatapp.service.GroupManager;
+import com.ycloud.chatapp.util.Logger;
 
 /**
  * 创建群组界面
@@ -42,62 +43,65 @@ public class GroupCreateActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        prefs = getSharedPreferences("chat_settings", MODE_PRIVATE);
-        groupManager = new GroupManager(prefs);
+        Logger.i("GroupCreateActivity", "onCreate 开始");
         
-        loadServers();
-        
-        // 主布局
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setBackgroundColor(Color.parseColor("#FAFAFA"));
-        
-        // 顶部栏
-        LinearLayout topBar = new LinearLayout(this);
-        topBar.setOrientation(LinearLayout.HORIZONTAL);
-        topBar.setBackgroundColor(Color.parseColor("#4CAF50"));
-        topBar.setPadding(24, 48, 24, 24);
-        
-        Button backBtn = new Button(this);
-        backBtn.setText("←");
-        backBtn.setTextSize(18);
-        backBtn.setBackgroundColor(Color.TRANSPARENT);
-        backBtn.setTextColor(Color.WHITE);
-        backBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                finish();
-            }
-        });
-        
-        TextView title = new TextView(this);
-        title.setText("创建群聊");
-        title.setTextSize(20);
-        title.setTextColor(Color.WHITE);
-        title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        
-        topBar.addView(backBtn);
-        topBar.addView(title);
-        layout.addView(topBar);
-        
-        // 内容区
-        ScrollView scrollView = new ScrollView(this);
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(24, 16, 24, 16);
-        scrollView.addView(content);
-        layout.addView(scrollView);
-        
-        // 群名称
-        TextView nameLabel = new TextView(this);
-        nameLabel.setText("群名称");
-        nameLabel.setTextSize(14);
-        nameLabel.setTextColor(Color.GRAY);
-        content.addView(nameLabel);
-        
-        groupNameInput = new EditText(this);
-        groupNameInput.setHint("例如：AI 技术讨论组");
-        groupNameInput.setTextSize(16);
+        try {
+            prefs = getSharedPreferences("chat_settings", MODE_PRIVATE);
+            groupManager = new GroupManager(prefs);
+            
+            loadServers();
+            
+            // 主布局
+            LinearLayout layout = new LinearLayout(this);
+            layout.setOrientation(LinearLayout.VERTICAL);
+            layout.setBackgroundColor(Color.parseColor("#FAFAFA"));
+            
+            // 顶部栏
+            LinearLayout topBar = new LinearLayout(this);
+            topBar.setOrientation(LinearLayout.HORIZONTAL);
+            topBar.setBackgroundColor(Color.parseColor("#4CAF50"));
+            topBar.setPadding(24, 48, 24, 24);
+            
+            Button backBtn = new Button(this);
+            backBtn.setText("←");
+            backBtn.setTextSize(18);
+            backBtn.setBackgroundColor(Color.TRANSPARENT);
+            backBtn.setTextColor(Color.WHITE);
+            backBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    finish();
+                }
+            });
+            
+            TextView title = new TextView(this);
+            title.setText("创建群聊");
+            title.setTextSize(20);
+            title.setTextColor(Color.WHITE);
+            title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            
+            topBar.addView(backBtn);
+            topBar.addView(title);
+            layout.addView(topBar);
+            
+            // 内容区
+            ScrollView scrollView = new ScrollView(this);
+            LinearLayout content = new LinearLayout(this);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setPadding(24, 16, 24, 16);
+            scrollView.addView(content);
+            layout.addView(scrollView);
+            
+            // 群名称
+            TextView nameLabel = new TextView(this);
+            nameLabel.setText("群名称");
+            nameLabel.setTextSize(14);
+            nameLabel.setTextColor(Color.GRAY);
+            content.addView(nameLabel);
+            
+            groupNameInput = new EditText(this);
+            groupNameInput.setHint("例如：AI 技术讨论组");
+            groupNameInput.setTextSize(16);
         groupNameInput.setPadding(16, 16, 16, 16);
         groupNameInput.setBackgroundColor(Color.WHITE);
         content.addView(groupNameInput);
@@ -184,6 +188,14 @@ public class GroupCreateActivity extends Activity {
         content.addView(createBtn);
         
         setContentView(layout);
+        
+        Logger.i("GroupCreateActivity", "onCreate 完成");
+        
+        } catch (Exception e) {
+            Logger.e("GroupCreateActivity", "onCreate 异常", e);
+            Toast.makeText(this, "初始化失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
     
     private void loadServers() {

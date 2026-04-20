@@ -28,6 +28,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import com.ycloud.chatapp.util.Logger;
 import java.util.Iterator;
 import java.io.InputStream;
 import java.io.FileReader;
@@ -486,6 +488,25 @@ public class SettingsActivity extends Activity {
             exportImportLayout.addView(exportBtn);
             exportImportLayout.addView(importBtn);
             content.addView(exportImportLayout);
+            
+            // 日志导出按钮
+            Button exportLogBtn = new Button(this);
+            exportLogBtn.setText("📋 导出日志");
+            exportLogBtn.setTextSize(14);
+            exportLogBtn.setPadding(20, 16, 20, 16);
+            exportLogBtn.setBackgroundColor(Color.parseColor("#FF9800"));
+            exportLogBtn.setTextColor(Color.WHITE);
+            android.view.ViewGroup.MarginLayoutParams logParams = new android.view.ViewGroup.MarginLayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            logParams.topMargin = 16;
+            exportLogBtn.setLayoutParams(logParams);
+            exportLogBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    exportLogs();
+                }
+            });
+            content.addView(exportLogBtn);
         }
         
         // 已保存的服务器列表
@@ -991,6 +1012,36 @@ public class SettingsActivity extends Activity {
             
         } catch (Exception e) {
             Toast.makeText(this, "❌ 应用配置失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    // 导出日志
+    private void exportLogs() {
+        try {
+            String logContent = Logger.readLogs();
+            if (logContent.isEmpty()) {
+                Toast.makeText(this, "暂无日志", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            // 保存到Documents目录
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.US);
+            String fileName = "chatapp_log_" + sdf.format(new java.util.Date()) + ".txt";
+            
+            java.io.File docsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOCUMENTS);
+            java.io.File logFile = new java.io.File(docsDir, fileName);
+            
+            java.io.FileWriter fw = new java.io.FileWriter(logFile);
+            fw.write(logContent);
+            fw.close();
+            
+            Toast.makeText(this, "📋 日志已导出:\n" + logFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            Logger.i("SettingsActivity", "日志导出成功: " + logFile.getAbsolutePath());
+            
+        } catch (Exception e) {
+            Toast.makeText(this, "❌ 导出日志失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Logger.e("SettingsActivity", "导出日志失败", e);
         }
     }
 }
