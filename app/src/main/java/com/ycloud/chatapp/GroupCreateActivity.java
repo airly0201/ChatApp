@@ -154,9 +154,7 @@ public class GroupCreateActivity extends Activity {
         membersContainer.setOrientation(LinearLayout.VERTICAL);
         content.addView(membersContainer);
         
-        displayServerList();
-        
-        // 主持人选择（模式二）
+        // 主持人选择（模式二）- 必须在 displayServerList 之前初始化
         TextView hostLabel = new TextView(this);
         hostLabel.setText("\n选择主持人（助手主持模式）");
         hostLabel.setTextSize(14);
@@ -165,6 +163,9 @@ public class GroupCreateActivity extends Activity {
         
         hostSpinner = new Spinner(this);
         content.addView(hostSpinner);
+        
+        // 显示服务器列表 - 需要 hostSpinner 已初始化
+        displayServerList();
         
         // 创建按钮
         Button createBtn = new Button(this);
