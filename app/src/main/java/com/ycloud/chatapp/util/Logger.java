@@ -129,17 +129,7 @@ public class Logger {
      */
     private static File getLogDirectory() {
         try {
-            // 优先使用应用私有目录
-            Context ctx = getContext();
-            if (ctx != null) {
-                File dir = new File(ctx.getFilesDir(), "logs");
-                if (!dir.exists()) {
-                    dir.mkdirs();
-                }
-                return dir;
-            }
-            
-            // 备用：使用外部存储
+            // 优先使用外部存储（用户可见）
             File dir = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOCUMENTS), "ChatApp/logs");
             if (!dir.exists()) {
@@ -147,6 +137,19 @@ public class Logger {
             }
             return dir;
         } catch (Exception e) {
+            // 备用：使用应用私有目录
+            try {
+                Context ctx = getContext();
+                if (ctx != null) {
+                    File dir = new File(ctx.getFilesDir(), "logs");
+                    if (!dir.exists()) {
+                        dir.mkdirs();
+                    }
+                    return dir;
+                }
+            } catch (Exception ex) {
+                // 忽略
+            }
             return null;
         }
     }
