@@ -11,9 +11,12 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 
 import com.ycloud.chatapp.model.Group;
 import com.ycloud.chatapp.model.Member;
@@ -22,6 +25,7 @@ import com.ycloud.chatapp.service.GroupManager;
 import com.ycloud.chatapp.service.MemberDispatcher;
 import com.ycloud.chatapp.service.MessageStorage;
 import com.ycloud.chatapp.service.PromptBuilder;
+import com.ycloud.chatapp.util.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,9 +69,12 @@ public class GroupChatActivity extends Activity {
         
         group = groupManager.getGroup(groupId);
         if (group == null) {
+            Logger.e("GroupChatActivity", "未找到群组: " + groupId);
             finish();
             return;
         }
+        
+        Logger.i("GroupChatActivity", "进入群聊: " + group.getName() + ", 模式: " + group.getModeName() + ", 成员数: " + group.getMembers().size());
         
         // 加载历史消息
         messages = messageStorage.loadHistory(groupId);
@@ -210,6 +217,54 @@ public class GroupChatActivity extends Activity {
         
         setContentView(layout);
         
+        // 监听 @ 提及
+        input.addTextChangedListener(new TextWatcher() {
+            private int atPosition = -1;
+            
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                String text = s.toString();
+                int lastAt = text.lastIndexOf('@', start + count - 1);
+                if (lastAt >= 0) {
+                    // 检查@后面是否还有空格或已结束
+                    String afterAt = text.substring(lastAt + 1);
+                    if (!afterAt.contains(" ") && !afterAt.isEmpty()) {
+                        atPosition = lastAt;
+                    } else if (afterAt.isEmpty()) {
+                        atPosition = lastAt;
+                    }
+                }
+            }
+            
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            
+            @Override
+            public void afterTextChanged(Editable s) {
+                String text = s.toString();
+                int cursorPos = input.getSelectionStart();
+                
+                // 检查是否在@后面输入
+                if (atPosition >= 0 && atPosition < text.length()) {
+                    String afterAt = text.substring(atPosition + 1);
+                    // 如果用户输入了空格或@结束，显示助手列表
+                    if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
+                        showMemberPopup(input, atPosition);
+                        atPosition = -1;
+                    }
+                }
+                
+                // 检查新输入的@
+                int lastAt = text.lastIndexOf('@');
+                if (lastAt >= 0 && (lastAt == text.length() - 1 || 
+                    text.charAt(lastAt + 1) == ' ' || cursorPos <= lastAt)) {
+                    atPosition = lastAt;
+                } else {
+                    atPosition = -1;
+                }
+            }
+        });
+        
         // 发送按钮事件
         sendBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -224,6 +279,8 @@ public class GroupChatActivity extends Activity {
         
         String content = input.getText().toString().trim();
         if (content.isEmpty()) return;
+        
+        Logger.i("GroupChatActivity", "发送消息: " + content);
         
         input.setText("");
         isLoading = true;
@@ -242,14 +299,17 @@ public class GroupChatActivity extends Activity {
             public void run() {
                 try {
                     List<Message> responses;
+                    String modeName = group.getModeName();
+                    Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size());
                     
                     switch (group.getMode()) {
                         case 1: // 用户主持
-                            // 简单实现：发给所有人（后续可加@选择）
+                            Logger.i("GroupChatActivity", "广播消息到所有成员");
                             responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
                             break;
                             
                         case 2: // 助手主持
+                            Logger.i("GroupChatActivity", "发送给主持人: " + group.getHostName());
                             Message hostResponse = dispatcher.sendToHost(group, content, messages, promptBuilder);
                             responses = new ArrayList<>();
                             responses.add(hostResponse);
@@ -257,9 +317,12 @@ public class GroupChatActivity extends Activity {
                             
                         case 0: // 平等讨论（默认）
                         default:
+                            Logger.i("GroupChatActivity", "广播消息到所有成员");
                             responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
                             break;
                     }
+                    
+                    Logger.i("GroupChatActivity", "收到响应数: " + responses.size());
                     
                     // 添加响应到历史
                     for (Message response : responses) {
@@ -281,6 +344,8 @@ public class GroupChatActivity extends Activity {
                     });
                     
                 } catch (final Exception e) {
+                    Logger.e("GroupChatActivity", "调用助手失败: " + e.getMessage());
+                    e.printStackTrace();
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
@@ -396,6 +461,43 @@ public class GroupChatActivity extends Activity {
                 container.addView(textView);
             }
         }
+    }
+    
+    // 显示成员选择弹出菜单
+    private void showMemberPopup(final EditText editText, final int atPosition) {
+        if (group == null || group.getMembers() == null || group.getMembers().isEmpty()) {
+            return;
+        }
+        
+        PopupMenu popup = new PopupMenu(this, editText);
+        for (Member member : group.getMembers()) {
+            String item = member.getAvatar() + " " + member.getName();
+            popup.getMenu().add(0, popup.getMenu().size(), popup.getMenu().size(), item);
+        }
+        
+        popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(android.view.MenuItem item) {
+                String selected = item.getTitle().toString();
+                String memberName = selected.substring(2); // 去掉emoji
+                
+                String text = editText.getText().toString();
+                int cursorPos = editText.getSelectionStart();
+                
+                // 找到@的位置并替换
+                int start = text.lastIndexOf('@', cursorPos - 1);
+                if (start >= 0) {
+                    String before = text.substring(0, start);
+                    String after = text.substring(cursorPos);
+                    String newText = before + "@" + memberName + " " + after;
+                    editText.setText(newText);
+                    editText.setSelection(start + memberName.length() + 2);
+                }
+                return true;
+            }
+        });
+        
+        popup.show();
     }
     
     private void scrollToBottom() {

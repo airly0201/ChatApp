@@ -18,6 +18,10 @@ import android.graphics.Matrix;
 import android.widget.ImageView;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.List;
+
+import com.ycloud.chatapp.model.Group;
+import com.ycloud.chatapp.service.GroupManager;
 import android.graphics.Color;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
@@ -941,6 +945,17 @@ public class SettingsActivity extends Activity {
             // 添加版本标记
             config.put("_export_version", "ChatApp v3.4");
             config.put("_export_time", System.currentTimeMillis());
+            
+            // 导出群聊配置
+            GroupManager groupManager = new GroupManager(prefs);
+            List<Group> groups = groupManager.getAllGroups();
+            if (!groups.isEmpty()) {
+                JSONArray groupsArr = new JSONArray();
+                for (Group g : groups) {
+                    groupsArr.put(g.toJSON());
+                }
+                config.put("saved_groups", groupsArr.toString());
+            }
             
             // 使用 SAF 创建文件
             android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);

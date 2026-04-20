@@ -3,6 +3,7 @@ package com.ycloud.chatapp.service;
 import com.ycloud.chatapp.model.Group;
 import com.ycloud.chatapp.model.Member;
 import com.ycloud.chatapp.model.Message;
+import com.ycloud.chatapp.util.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -29,6 +30,7 @@ public class MemberDispatcher {
      */
     public List<Message> broadcast(Group group, String message, List<Message> history, 
                                    PromptBuilder promptBuilder, OnProgressListener listener) {
+        Logger.i("MemberDispatcher", "broadcast: 成员数=" + group.getMembers().size() + ", 消息=" + message.substring(0, Math.min(50, message.length())));
         List<Message> responses = new ArrayList<>();
         List<Member> members = group.getMembers();
         
@@ -65,6 +67,7 @@ public class MemberDispatcher {
      */
     public Message sendToMember(Member member, Group group, String message, 
                                 List<Message> history, PromptBuilder promptBuilder) {
+        Logger.i("MemberDispatcher", "sendToMember: " + member.getName() + ", 消息=" + message.substring(0, Math.min(30, message.length())));
         try {
             JSONArray messages = promptBuilder.buildMessagesForAPI(group, member, history, message);
             String response = callAPI(member, messages);
@@ -86,6 +89,7 @@ public class MemberDispatcher {
      */
     public Message sendToHost(Group group, String message, List<Message> history, 
                               PromptBuilder promptBuilder) {
+        Logger.i("MemberDispatcher", "sendToHost: 主持人=" + group.getHostName());
         Member host = findMemberByName(group, group.getHostName());
         if (host == null) {
             return new Message("系统", "未找到主持人");
