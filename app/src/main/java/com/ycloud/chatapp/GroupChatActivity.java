@@ -341,24 +341,44 @@ public class GroupChatActivity extends Activity {
                         break;
                         
                     case 2: // 助手主持 - 协调模式
-                        Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
-                        List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
-                        // 直接在方法返回时保证不为 null
-                        if (case2Responses == null) {
-                            case2Responses = new ArrayList<>();
+                        // 检查消息是否包含 @ 提及，有@则只让被@的助手响应（跳过主持人协调）
+                        Member mentionedForMode2 = parseMentionedMember(content);
+                        if (mentionedForMode2 != null) {
+                            Logger.i("GroupChatActivity", "助手主持模式: @指定助手 " + mentionedForMode2.getName() + "，直接响应");
+                            List<Message> case2Responses = new ArrayList<>();
+                            Message singleResponse = dispatcher.sendToMember(mentionedForMode2, group, content, messages, promptBuilder);
+                            case2Responses.add(singleResponse);
+                            responses = case2Responses;
+                        } else {
+                            Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
+                            List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
+                            // 直接在方法返回时保证不为 null
+                            if (case2Responses == null) {
+                                case2Responses = new ArrayList<>();
+                            }
+                            responses = case2Responses;
                         }
-                        responses = case2Responses;
                         break;
                         
                     case 0: // 平等讨论（默认）
                     default:
-                        Logger.i("GroupChatActivity", "广播消息到所有成员");
-                        List<Message> case0Responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
-                        // 直接在方法返回时保证不为 null
-                        if (case0Responses == null) {
-                            case0Responses = new ArrayList<>();
+                        // 检查消息是否包含 @ 提及，有@则只让被@的助手响应，无@则广播
+                        Member mentionedMember = parseMentionedMember(content);
+                        if (mentionedMember != null) {
+                            Logger.i("GroupChatActivity", "平等讨论模式: @指定助手 " + mentionedMember.getName());
+                            List<Message> case0Responses = new ArrayList<>();
+                            Message singleResponse = dispatcher.sendToMember(mentionedMember, group, content, messages, promptBuilder);
+                            case0Responses.add(singleResponse);
+                            responses = case0Responses;
+                        } else {
+                            Logger.i("GroupChatActivity", "广播消息到所有成员");
+                            List<Message> case0Responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
+                            // 直接在方法返回时保证不为 null
+                            if (case0Responses == null) {
+                                case0Responses = new ArrayList<>();
+                            }
+                            responses = case0Responses;
                         }
-                        responses = case0Responses;
                         break;
                 }
                 
