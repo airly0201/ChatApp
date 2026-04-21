@@ -597,11 +597,20 @@ public class GroupChatActivity extends Activity {
     /**
      * 解析消息中所有 @ 提及的成员
      * 返回所有被@的助手列表（去重）
+     * 支持 @所有人 或 @all 让所有助手响应
      */
     private List<Member> parseAllMentionedMembers(String content) {
         List<Member> mentionedMembers = new ArrayList<>();
         
         if (group == null || group.getMembers() == null) {
+            return mentionedMembers;
+        }
+        
+        // 检查是否@所有人
+        String lowerContent = content.toLowerCase();
+        if (lowerContent.contains("@所有人") || lowerContent.contains("@all") || lowerContent.contains("@ everyone")) {
+            Logger.i("GroupChatActivity", "检测到@所有人，添加所有成员");
+            mentionedMembers.addAll(group.getMembers());
             return mentionedMembers;
         }
         
@@ -675,10 +684,14 @@ public class GroupChatActivity extends Activity {
         boolean mentioned = false;
         String memberName = member.getName();
         
+        // 检查是否@所有人，如果是则不显示@提示
+        String lowerMessage = originalMessage.toLowerCase();
+        boolean isMentionAll = lowerMessage.contains("@所有人") || lowerMessage.contains("@all") || lowerMessage.contains("@ everyone");
+        
         // 简单的@检测
-        if (originalMessage.contains("@" + memberName)) {
+        if (!isMentionAll && originalMessage.contains("@" + memberName)) {
             mentioned = true;
-        } else {
+        } else if (!isMentionAll) {
             // 也检查带emoji的情况
             for (int i = 0; i < originalMessage.length(); i++) {
                 if (originalMessage.charAt(i) == '@') {
