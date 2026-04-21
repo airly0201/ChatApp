@@ -175,6 +175,21 @@ public class GroupChatActivity extends Activity {
         
         topRow.addView(backBtn);
         topRow.addView(titleLayout);
+        
+        // 添加菜单按钮（导出日志等）
+        Button menuBtn = new Button(this);
+        menuBtn.setText("⋮");
+        menuBtn.setTextSize(20);
+        menuBtn.setBackgroundColor(Color.TRANSPARENT);
+        menuBtn.setTextColor(Color.WHITE);
+        menuBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showMenuDialog();
+            }
+        });
+        topRow.addView(menuBtn);
+        
         topBar.addView(topRow);
         
         // 显示成员头像行
@@ -260,45 +275,44 @@ public class GroupChatActivity extends Activity {
         this.debugPanel = debugPanel;
         updateDebugPanel("就绪");
         
-        // 监听 @ 提及
+        // 监听 @ 提及 - 优化版
         input.addTextChangedListener(new TextWatcher() {
-            private int atPosition = -1;
+            private boolean isSelectingMember = false;
             
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                // 不在 beforeTextChanged 中处理，留给 afterTextChanged
-            }
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {}
             
             @Override
             public void afterTextChanged(Editable s) {
+                if (isSelectingMember) return;
+                
                 String text = s.toString();
                 int cursorPos = input.getSelectionStart();
                 
-                // 检查是否在@后面输入
-                if (atPosition >= 0 && atPosition < text.length()) {
-                    String afterAt = text.substring(atPosition + 1);
-                    // 如果用户输入了非空字符（不是空格），立即显示助手列表
-                    if (!afterAt.isEmpty() && !afterAt.startsWith(" ")) {
-                        showMemberPopup(input, atPosition);
-                        atPosition = -1;
-                    } else if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
-                        // 如果是空格或空，也显示
-                        showMemberPopup(input, atPosition);
-                        atPosition = -1;
+                // 找到光标前的最后一个@（不在空格后的）
+                int atPos = -1;
+                for (int i = cursorPos - 1; i >= 0; i--) {
+                    if (text.charAt(i) == '@') {
+                        // 检查@前面是空格或开头
+                        if (i == 0 || text.charAt(i - 1) == ' ') {
+                            atPos = i;
+                            break;
+                        }
                     }
                 }
                 
-                // 检查新输入的@ - 只要文本中有@且光标在@后面
-                int lastAt = text.lastIndexOf('@');
-                if (lastAt >= 0 && (lastAt == text.length() - 1 || 
-                    (lastAt + 1 < text.length() && text.charAt(lastAt + 1) != ' ') ||
-                    cursorPos > lastAt)) {
-                    atPosition = lastAt;
-                } else {
-                    atPosition = -1;
+                if (atPos >= 0) {
+                    // @后面是空格或空？显示列表
+                    String afterAt = (atPos + 1 < text.length()) ? text.substring(atPos + 1) : "";
+                    if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
+                        showMemberPopup(input, atPos);
+                        isSelectingMember = true;
+                        // 延迟恢复，允许选择
+                        input.postDelayed(() -> isSelectingMember = false, 500);
+                    }
                 }
             }
         });
@@ -738,5 +752,45 @@ public class GroupChatActivity extends Activity {
         sb.append(cleanedMessage);
         
         return sb.toString();
+    }
+    
+    /**
+     * 显示菜单对话框
+     */
+    private void showMenuDialog() {
+        final String[] menuItems = {"导出日志", "清空聊天记录", "刷新界面"};
+        
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("菜单");
+        builder.setItems(menuItems, (dialog, which) -> {
+            if (which == 0) {
+                // 导出日志
+                try {
+                    String logPath = Logger.exportLogs(getExternalFilesDir(null).getAbsolutePath());
+                    Toast.makeText(this, "📋 日志已导出到:\n" + logPath, Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    Toast.makeText(this, "❌ 导出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            } else if (which == 1) {
+                // 清空聊天记录
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("确认清空")
+                    .setMessage("确定要清空当前群聊的所有聊天记录吗？")
+                    .setPositiveButton("确定", (d, w) -> {
+                        messageStorage.clearHistory(groupId);
+                        messages.clear();
+                        msgContainer.removeAllViews();
+                        Toast.makeText(this, "已清空", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton("取消", null)
+                    .show();
+            } else if (which == 2) {
+                // 刷新界面
+                msgContainer.removeAllViews();
+                displayMessages();
+                Toast.makeText(this, "已刷新", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.show();
     }
 }
