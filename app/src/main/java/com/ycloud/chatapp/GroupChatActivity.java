@@ -329,14 +329,16 @@ public class GroupChatActivity extends Activity {
                         Logger.i("GroupChatActivity", "用户主持模式: 解析@指定的助手");
                         // 创建新的列表
                         List<Message> case1Responses = new ArrayList<>();
-                        // 解析 @ 提及的助手
-                        Member targetMember = parseMentionedMember(content);
-                        if (targetMember != null) {
-                            Logger.i("GroupChatActivity", "发送给指定助手: " + targetMember.getName());
-                            // 构建发送给助手的消息（添加@提示，去掉@引用）
-                            String messageForMember = buildMessageForMember(targetMember, content);
-                            Message singleResponse = dispatcher.sendToMember(targetMember, group, messageForMember, messages, promptBuilder);
-                            case1Responses.add(singleResponse);
+                        // 解析所有 @ 提及的助手
+                        List<Member> targetMembers = parseAllMentionedMembers(content);
+                        if (!targetMembers.isEmpty()) {
+                            Logger.i("GroupChatActivity", "发送给指定助手: " + targetMembers.size() + "个");
+                            // 对每个被@的助手发送消息
+                            for (Member targetMember : targetMembers) {
+                                String messageForMember = buildMessageForMember(targetMember, content);
+                                Message singleResponse = dispatcher.sendToMember(targetMember, group, messageForMember, messages, promptBuilder);
+                                case1Responses.add(singleResponse);
+                            }
                         } else if (!content.contains("@")) {
                             // 没有@时，提示用户需要@指定
                             case1Responses.add(new Message("系统", "请使用 @ 符号指定要回覆的助手，例如: @助手名称 你的问题"));
@@ -348,14 +350,16 @@ public class GroupChatActivity extends Activity {
                         
                     case 2: // 助手主持 - 协调模式
                         // 检查消息是否包含 @ 提及，有@则只让被@的助手响应（跳过主持人协调）
-                        Member mentionedForMode2 = parseMentionedMember(content);
-                        if (mentionedForMode2 != null) {
-                            Logger.i("GroupChatActivity", "助手主持模式: @指定助手 " + mentionedForMode2.getName() + "，直接响应");
+                        List<Member> mentionedForMode2 = parseAllMentionedMembers(content);
+                        if (!mentionedForMode2.isEmpty()) {
+                            Logger.i("GroupChatActivity", "助手主持模式: @指定助手 " + mentionedForMode2.size() + "个，直接响应");
                             List<Message> case2Responses = new ArrayList<>();
-                            // 构建发送给助手的消息（添加@提示，去掉@引用）
-                            String messageForMember = buildMessageForMember(mentionedForMode2, content);
-                            Message singleResponse = dispatcher.sendToMember(mentionedForMode2, group, messageForMember, messages, promptBuilder);
-                            case2Responses.add(singleResponse);
+                            // 对每个被@的助手发送消息
+                            for (Member mentionedMember : mentionedForMode2) {
+                                String messageForMember = buildMessageForMember(mentionedMember, content);
+                                Message singleResponse = dispatcher.sendToMember(mentionedMember, group, messageForMember, messages, promptBuilder);
+                                case2Responses.add(singleResponse);
+                            }
                             responses = case2Responses;
                         } else {
                             Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
@@ -371,14 +375,16 @@ public class GroupChatActivity extends Activity {
                     case 0: // 平等讨论（默认）
                     default:
                         // 检查消息是否包含 @ 提及，有@则只让被@的助手响应，无@则广播
-                        Member mentionedMember = parseMentionedMember(content);
-                        if (mentionedMember != null) {
-                            Logger.i("GroupChatActivity", "平等讨论模式: @指定助手 " + mentionedMember.getName());
+                        List<Member> mentionedMembers = parseAllMentionedMembers(content);
+                        if (!mentionedMembers.isEmpty()) {
+                            Logger.i("GroupChatActivity", "平等讨论模式: @指定助手 " + mentionedMembers.size() + "个");
                             List<Message> case0Responses = new ArrayList<>();
-                            // 构建发送给助手的消息（添加@提示，去掉@引用）
-                            String messageForMember = buildMessageForMember(mentionedMember, content);
-                            Message singleResponse = dispatcher.sendToMember(mentionedMember, group, messageForMember, messages, promptBuilder);
-                            case0Responses.add(singleResponse);
+                            // 对每个被@的助手发送消息
+                            for (Member mentionedMember : mentionedMembers) {
+                                String messageForMember = buildMessageForMember(mentionedMember, content);
+                                Message singleResponse = dispatcher.sendToMember(mentionedMember, group, messageForMember, messages, promptBuilder);
+                                case0Responses.add(singleResponse);
+                            }
                             responses = case0Responses;
                         } else {
                             Logger.i("GroupChatActivity", "广播消息到所有成员");
@@ -584,8 +590,19 @@ public class GroupChatActivity extends Activity {
      * 支持格式：@助手名 或 @‍💻 助手名（带emoji）
      */
     private Member parseMentionedMember(String content) {
+        List<Member> allMembers = parseAllMentionedMembers(content);
+        return allMembers.isEmpty() ? null : allMembers.get(0);
+    }
+    
+    /**
+     * 解析消息中所有 @ 提及的成员
+     * 返回所有被@的助手列表（去重）
+     */
+    private List<Member> parseAllMentionedMembers(String content) {
+        List<Member> mentionedMembers = new ArrayList<>();
+        
         if (group == null || group.getMembers() == null) {
-            return null;
+            return mentionedMembers;
         }
         
         // 查找所有 @ 符号位置
@@ -597,7 +614,7 @@ public class GroupChatActivity extends Activity {
         }
         
         if (atPositions.isEmpty()) {
-            return null;
+            return mentionedMembers;
         }
         
         // 尝试解析每个@位置后的名称
@@ -631,17 +648,20 @@ public class GroupChatActivity extends Activity {
                 String memberName = member.getName();
                 
                 // 精确匹配
-                if (memberName.equals(mentionedName)) {
-                    return member;
-                }
+                boolean matched = memberName.equals(mentionedName);
                 // 模糊匹配（被@的名称包含成员名，或成员名包含被@的名称）
-                if (mentionedName.length() >= 2 && (memberName.contains(mentionedName) || mentionedName.contains(memberName))) {
-                    return member;
+                if (!matched && mentionedName.length() >= 2 && (memberName.contains(mentionedName) || mentionedName.contains(memberName))) {
+                    matched = true;
+                }
+                
+                if (matched && !mentionedMembers.contains(member)) {
+                    mentionedMembers.add(member);
+                    break; // 一个@只匹配一个成员
                 }
             }
         }
         
-        return null;
+        return mentionedMembers;
     }
     
     /**
