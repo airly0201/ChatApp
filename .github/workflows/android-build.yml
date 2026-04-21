@@ -49,6 +49,6 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: app-release.apk
-        body: 'ChatApp v3.3 - 修复输入框自动聚焦问题，支持配置导出/导入'
+        body: 'ChatApp v3.10 - 群聊消息增加选择复制能力，聊天内容记录日志'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
