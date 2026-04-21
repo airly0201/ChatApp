@@ -11,6 +11,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -58,6 +59,9 @@ public class GroupChatActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // 设置软键盘模式：只调整内容区域，不顶起头部
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         
         groupId = getIntent().getStringExtra("group_id");
         if (groupId == null) {
@@ -329,7 +333,9 @@ public class GroupChatActivity extends Activity {
                         Member targetMember = parseMentionedMember(content);
                         if (targetMember != null) {
                             Logger.i("GroupChatActivity", "发送给指定助手: " + targetMember.getName());
-                            Message singleResponse = dispatcher.sendToMember(targetMember, group, content, messages, promptBuilder);
+                            // 构建发送给助手的消息（添加@提示，去掉@引用）
+                            String messageForMember = buildMessageForMember(targetMember, content);
+                            Message singleResponse = dispatcher.sendToMember(targetMember, group, messageForMember, messages, promptBuilder);
                             case1Responses.add(singleResponse);
                         } else if (!content.contains("@")) {
                             // 没有@时，提示用户需要@指定
@@ -346,7 +352,9 @@ public class GroupChatActivity extends Activity {
                         if (mentionedForMode2 != null) {
                             Logger.i("GroupChatActivity", "助手主持模式: @指定助手 " + mentionedForMode2.getName() + "，直接响应");
                             List<Message> case2Responses = new ArrayList<>();
-                            Message singleResponse = dispatcher.sendToMember(mentionedForMode2, group, content, messages, promptBuilder);
+                            // 构建发送给助手的消息（添加@提示，去掉@引用）
+                            String messageForMember = buildMessageForMember(mentionedForMode2, content);
+                            Message singleResponse = dispatcher.sendToMember(mentionedForMode2, group, messageForMember, messages, promptBuilder);
                             case2Responses.add(singleResponse);
                             responses = case2Responses;
                         } else {
@@ -367,7 +375,9 @@ public class GroupChatActivity extends Activity {
                         if (mentionedMember != null) {
                             Logger.i("GroupChatActivity", "平等讨论模式: @指定助手 " + mentionedMember.getName());
                             List<Message> case0Responses = new ArrayList<>();
-                            Message singleResponse = dispatcher.sendToMember(mentionedMember, group, content, messages, promptBuilder);
+                            // 构建发送给助手的消息（添加@提示，去掉@引用）
+                            String messageForMember = buildMessageForMember(mentionedMember, content);
+                            Message singleResponse = dispatcher.sendToMember(mentionedMember, group, messageForMember, messages, promptBuilder);
                             case0Responses.add(singleResponse);
                             responses = case0Responses;
                         } else {
@@ -571,39 +581,111 @@ public class GroupChatActivity extends Activity {
     
     /**
      * 解析消息中 @ 提及的成员
+     * 支持格式：@助手名 或 @‍💻 助手名（带emoji）
      */
     private Member parseMentionedMember(String content) {
         if (group == null || group.getMembers() == null) {
             return null;
         }
         
-        // 查找 @ 符号
-        int atIndex = content.indexOf('@');
-        if (atIndex < 0) {
-            return null;
-        }
-        
-        // 获取 @ 后面的内容（到空格为止）
-        String afterAt = content.substring(atIndex + 1).trim();
-        if (afterAt.isEmpty()) {
-            return null;
-        }
-        
-        // 去除可能的消息内容，只保留被@的名称
-        String[] parts = afterAt.split("\\s+");
-        String mentionedName = parts[0];
-        
-        // 查找匹配的成员
-        for (Member member : group.getMembers()) {
-            if (member.getName().equals(mentionedName)) {
-                return member;
+        // 查找所有 @ 符号位置
+        List<Integer> atPositions = new ArrayList<>();
+        for (int i = 0; i < content.length(); i++) {
+            if (content.charAt(i) == '@') {
+                atPositions.add(i);
             }
-            // 也支持模糊匹配（包含关系）
-            if (mentionedName.length() >= 2 && member.getName().contains(mentionedName)) {
-                return member;
+        }
+        
+        if (atPositions.isEmpty()) {
+            return null;
+        }
+        
+        // 尝试解析每个@位置后的名称
+        for (int atPos : atPositions) {
+            String afterAt = content.substring(atPos + 1);
+            
+            // 去除可能的前导emoji或特殊字符（零宽连接符等）
+            afterAt = afterAt.replaceAll("^[\\u200B-\\u200D\\uFEFF]", ""); // 去除零宽字符
+            afterAt = afterAt.replaceAll("^[\\p{So}\\p{Sk}]+", ""); // 去除emoji modifier
+            afterAt = afterAt.trim();
+            
+            if (afterAt.isEmpty()) {
+                continue;
+            }
+            
+            // 提取第一个单词（到空格为止）
+            String[] parts = afterAt.split("\\s+");
+            if (parts.length == 0) continue;
+            
+            String mentionedName = parts[0];
+            
+            // 去除可能的标点符号
+            mentionedName = mentionedName.replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fa5-]", "");
+            
+            if (mentionedName.isEmpty()) {
+                continue;
+            }
+            
+            // 查找匹配的成员
+            for (Member member : group.getMembers()) {
+                String memberName = member.getName();
+                
+                // 精确匹配
+                if (memberName.equals(mentionedName)) {
+                    return member;
+                }
+                // 模糊匹配（被@的名称包含成员名，或成员名包含被@的名称）
+                if (mentionedName.length() >= 2 && (memberName.contains(mentionedName) || mentionedName.contains(memberName))) {
+                    return member;
+                }
             }
         }
         
         return null;
+    }
+    
+    /**
+     * 清理消息中的@引用，生成发送给助手的消息
+     * 如果消息中有@该助手，加上"你被@了"的提示
+     */
+    private String buildMessageForMember(Member member, String originalMessage) {
+        StringBuilder sb = new StringBuilder();
+        
+        // 检查是否@了这个助手
+        boolean mentioned = false;
+        String memberName = member.getName();
+        
+        // 简单的@检测
+        if (originalMessage.contains("@" + memberName)) {
+            mentioned = true;
+        } else {
+            // 也检查带emoji的情况
+            for (int i = 0; i < originalMessage.length(); i++) {
+                if (originalMessage.charAt(i) == '@') {
+                    String afterAt = originalMessage.substring(i + 1);
+                    afterAt = afterAt.replaceAll("^[\\u200B-\\u200D\\uFEFF]", "");
+                    afterAt = afterAt.replaceAll("^[\\p{So}\\p{Sk}]+", "");
+                    afterAt = afterAt.trim();
+                    if (afterAt.startsWith(memberName) || afterAt.split("\\s+")[0].contains(memberName)) {
+                        mentioned = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (mentioned) {
+            sb.append("你在群聊中被@了！请针对以下问题回复：\n\n");
+        }
+        
+        // 清理消息中的@引用部分（可选：也可以保留让助手自己判断）
+        // 这里保留原消息但去掉@该助手的部分
+        String cleanedMessage = originalMessage;
+        cleanedMessage = cleanedMessage.replaceAll("@" + memberName, "").trim();
+        // 也清理其他@（可选）
+        
+        sb.append(cleanedMessage);
+        
+        return sb.toString();
     }
 }
