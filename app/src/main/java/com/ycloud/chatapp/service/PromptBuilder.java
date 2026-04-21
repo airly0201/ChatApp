@@ -18,6 +18,18 @@ public class PromptBuilder {
      */
     public String buildSystemPrompt(Group group, Member targetMember, List<Message> history) {
         StringBuilder sb = new StringBuilder();
+        
+        // 0. 明确身份（最重要！）
+        sb.append("【你的身份】\n");
+        sb.append(String.format("你是「%s」%s\n", 
+            targetMember.getName(),
+            targetMember.getAvatar() != null ? targetMember.getAvatar() : "🤖"));
+        
+        String myIntro = group.getIntroductions().get(targetMember.getName());
+        if (myIntro != null && !myIntro.isEmpty()) {
+            sb.append(String.format("你的自我介绍：%s\n", myIntro));
+        }
+        sb.append("记住：你就是「").append(targetMember.getName()).append("」，不是其他任何人！\n\n");
 
         // 1. 群规
         sb.append("【群规】\n");
