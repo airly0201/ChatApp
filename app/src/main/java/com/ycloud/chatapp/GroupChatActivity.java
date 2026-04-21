@@ -114,6 +114,9 @@ public class GroupChatActivity extends Activity {
                     // 保存自我介绍
                     groupManager.updateIntroduction(groupId, finalNeedIntro.getName(), introMsg.getContent());
                     
+                    // 记录自我介绍到日志
+                    Logger.i("ChatLog", "[群聊:" + group.getName() + "] 【" + finalNeedIntro.getName() + " 自我介绍】" + introMsg.getContent());
+                    
                     // 添加到历史
                     messages.add(introMsg);
                     messageStorage.addMessage(groupId, introMsg);
@@ -343,6 +346,10 @@ public class GroupChatActivity extends Activity {
         Message userMsg = new Message("你", content);
         messages.add(userMsg);
         messageStorage.addMessage(groupId, userMsg);
+        
+        // 记录聊天内容到日志
+        Logger.i("ChatLog", "[群聊:" + group.getName() + "] 【用户】" + content);
+        
         displaySingleMessage(userMsg);
         scrollToBottom();
         
@@ -434,6 +441,11 @@ public class GroupChatActivity extends Activity {
                 
                 // 创建 final 副本供内部类使用
                 final List<Message> finalResponses = responses;
+                
+                // 记录每个助手的响应到日志
+                for (Message response : responses) {
+                    Logger.i("ChatLog", "[群聊:" + group.getName() + "] 【" + response.getSender() + "】" + response.getContent());
+                }
                 
                 // 添加响应到历史
                 for (Message response : responses) {
@@ -549,6 +561,10 @@ public class GroupChatActivity extends Activity {
                 textView.setText(line);
                 textView.setTextSize(16);
                 textView.setTextColor(textColor);
+                
+                // 启用文本选择功能（长按可选中复制）
+                textView.setTextIsSelectable(true);
+                textView.setFocusable(true);
                 
                 // 代码块处理
                 if (line.startsWith("```") || line.trim().startsWith("```")) {
