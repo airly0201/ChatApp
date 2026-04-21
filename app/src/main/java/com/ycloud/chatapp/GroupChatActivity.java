@@ -223,6 +223,24 @@ public class GroupChatActivity extends Activity {
         sendBtn.setTextColor(Color.WHITE);
         
         inputBar.addView(input);
+        
+        // 添加 @所有人 快捷按钮
+        Button atAllBtn = new Button(this);
+        atAllBtn.setText("@所有");
+        atAllBtn.setTextSize(12);
+        atAllBtn.setPadding(12, 8, 12, 8);
+        atAllBtn.setBackgroundColor(Color.parseColor("#FF9800"));
+        atAllBtn.setTextColor(Color.WHITE);
+        atAllBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                input.setText("@所有人 ");
+                input.setSelection(input.getText().length());
+                input.requestFocus();
+            }
+        });
+        inputBar.addView(atAllBtn);
+        
         inputBar.addView(sendBtn);
         layout.addView(inputBar);
         
