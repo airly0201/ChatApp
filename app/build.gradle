@@ -10,8 +10,8 @@ android {
         applicationId "com.ycloud.chatapp"
         minSdk 24
         targetSdk 34
-        versionCode 10
-        versionName "3.9"
+        versionCode 11
+        versionName "3.10"
     }
 
     signingConfigs {

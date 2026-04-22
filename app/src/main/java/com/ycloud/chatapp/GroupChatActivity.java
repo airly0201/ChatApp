@@ -278,9 +278,10 @@ public class GroupChatActivity extends Activity {
         this.debugPanel = debugPanel;
         updateDebugPanel("就绪");
         
-        // 监听 @ 提及 - 优化版
+        // 监听 @ 提及 - 优化版：只在第一次输入@时弹出，选择后直到下一次输入@前不再弹出
         input.addTextChangedListener(new TextWatcher() {
             private boolean isSelectingMember = false;
+            private int lastAtPosition = -1;  // 记录最后一个有效的@位置
             
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -290,10 +291,33 @@ public class GroupChatActivity extends Activity {
             
             @Override
             public void afterTextChanged(Editable s) {
-                if (isSelectingMember) return;
-                
                 String text = s.toString();
                 int cursorPos = input.getSelectionStart();
+                if (cursorPos < 0) cursorPos = 0;
+                
+                // 检查是否删除了之前的@（即lastAtPosition所指的@不存在了）
+                if (lastAtPosition >= 0) {
+                    boolean atStillExists = false;
+                    if (lastAtPosition < text.length() && text.charAt(lastAtPosition) == '@') {
+                        atStillExists = true;
+                    }
+                    if (!atStillExists) {
+                        // @被删除了，重置状态
+                        lastAtPosition = -1;
+                        isSelectingMember = false;
+                    }
+                }
+                
+                // 如果正在选择成员中，且@后面有文字了，说明用户正在选择或已选择，不弹窗
+                if (isSelectingMember && lastAtPosition >= 0) {
+                    String afterAt = (lastAtPosition + 1 < text.length()) ? text.substring(lastAtPosition + 1) : "";
+                    // 如果@后面有非空格文字，说明用户正在输入名字，不弹出
+                    if (!afterAt.isEmpty() && !afterAt.startsWith(" ")) {
+                        return;
+                    }
+                }
+                
+                if (isSelectingMember) return;
                 
                 // 找到光标前的最后一个@（不在空格后的）
                 int atPos = -1;
@@ -313,8 +337,8 @@ public class GroupChatActivity extends Activity {
                     if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
                         showMemberPopup(input, atPos);
                         isSelectingMember = true;
-                        // 延迟恢复，允许选择
-                        input.postDelayed(() -> isSelectingMember = false, 500);
+                        lastAtPosition = atPos;
+                        // 不再使用延迟重置，改为手动控制
                     }
                 }
             }
