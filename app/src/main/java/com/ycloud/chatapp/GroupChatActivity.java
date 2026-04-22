@@ -386,6 +386,7 @@ public class GroupChatActivity extends Activity {
                 final List<Message> responses;
                 String modeName = group.getModeName();
                 Logger.i("GroupChatActivity", "群聊模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息数: " + messages.size());
+                Logger.i("ChatLog", "[调测] 群聊: " + group.getName() + ", 模式: " + modeName + ", 成员数: " + group.getMembers().size() + ", 历史消息: " + messages.size());
                 
                 switch (group.getMode()) {
                     case 1: // 用户主持 - @指定某个助手
@@ -408,6 +409,9 @@ public class GroupChatActivity extends Activity {
                             for (Member targetMember : targetMembers) {
                                 String messageForMember = buildMessageForMember(targetMember, content);
                                 Message singleResponse = dispatcher.sendToMember(targetMember, group, messageForMember, messages, promptBuilder);
+                                // 记录每个助手调用状态
+                                boolean isSuccess = singleResponse != null && !singleResponse.getContent().startsWith("错误");
+                                Logger.i("ChatLog", "[调测] 用户主持模式 - " + targetMember.getName() + ": " + (isSuccess ? "成功" : "失败"));
                                 case1Responses.add(singleResponse);
                             }
                         } else if (!content.contains("@")) {
@@ -422,6 +426,7 @@ public class GroupChatActivity extends Activity {
                     case 2: // 助手主持 - 协调模式
                         // 无论是否有@提及，都先让主持人协调分配任务
                         Logger.i("GroupChatActivity", "助手主持模式: 主持人(" + group.getHostName() + ")协调中...");
+                        Logger.i("ChatLog", "[调测] 助手主持模式 - 主持人: " + group.getHostName() + ", 成员数: " + group.getMembers().size());
                         List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
                         // 直接在方法返回时保证不为 null
                         if (case2Responses == null) {
@@ -441,12 +446,17 @@ public class GroupChatActivity extends Activity {
                             for (Member mentionedMember : mentionedMembers) {
                                 String messageForMember = buildMessageForMember(mentionedMember, content);
                                 Message singleResponse = dispatcher.sendToMember(mentionedMember, group, messageForMember, messages, promptBuilder);
+                                // 记录每个助手调用状态
+                                boolean isSuccess = singleResponse != null && !singleResponse.getContent().startsWith("错误");
+                                Logger.i("ChatLog", "[调测] 平等讨论模式 - @" + mentionedMember.getName() + ": " + (isSuccess ? "成功" : "失败"));
                                 case0Responses.add(singleResponse);
                             }
                             responses = case0Responses;
                         } else {
                             Logger.i("GroupChatActivity", "广播消息到所有成员");
                             List<Message> case0Responses = dispatcher.broadcast(group, content, messages, promptBuilder, null);
+                            // 记录广播模式调测信息
+                            Logger.i("ChatLog", "[调测] 平等讨论模式 - 广播到 " + group.getMembers().size() + " 个成员");
                             // 直接在方法返回时保证不为 null
                             if (case0Responses == null) {
                                 case0Responses = new ArrayList<>();
