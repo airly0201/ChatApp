@@ -282,7 +282,7 @@ public class GroupChatActivity extends Activity {
         this.debugPanel = debugPanel;
         updateDebugPanel("就绪");
         
-        // 监听 @ 提及 - 优化版：每次输入@都弹出，选择后直到发送/删除前不再弹出
+        // 监听 @ 提及 - 每次输入@都弹出助手列表
         input.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -295,19 +295,6 @@ public class GroupChatActivity extends Activity {
                 String text = s.toString();
                 int cursorPos = input.getSelectionStart();
                 if (cursorPos < 0) cursorPos = 0;
-                
-                // 检查是否删除了之前的@（即lastAtPosition所指的@不存在了）
-                if (lastAtPosition >= 0) {
-                    boolean atStillExists = false;
-                    if (lastAtPosition < text.length() && text.charAt(lastAtPosition) == '@') {
-                        atStillExists = true;
-                    }
-                    if (!atStillExists) {
-                        // @被删除了，重置状态
-                        lastAtPosition = -1;
-                        isSelectingMember = false;
-                    }
-                }
                 
                 // 找到光标前的最后一个@（不在空格后的）
                 int atPos = -1;
@@ -323,25 +310,16 @@ public class GroupChatActivity extends Activity {
                 
                 if (atPos >= 0) {
                     String afterAt = (atPos + 1 < text.length()) ? text.substring(atPos + 1) : "";
-                    boolean isNewAt = (atPos != lastAtPosition);  // 检测是否是一个新的@
-                    
-                    // 如果正在选择成员中，且正在输入名字（@后面有非空格文字），不弹窗
-                    if (isSelectingMember && lastAtPosition >= 0) {
-                        String afterLastAt = (lastAtPosition + 1 < text.length()) ? text.substring(lastAtPosition + 1) : "";
-                        if (!afterLastAt.isEmpty() && !afterLastAt.startsWith(" ")) {
-                            return;  // 正在输入名字，不弹出
-                        }
-                    }
                     
                     // 显示列表条件：@后面是空格或空
                     if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
-                        // 如果是新@，或者之前没有在选择状态，就弹出
-                        if (isNewAt || !isSelectingMember) {
-                            showMemberPopup(input, atPos);
-                            isSelectingMember = true;
-                            lastAtPosition = atPos;
-                        }
+                        // 每次都弹出，让用户选择
+                        showMemberPopup(input, atPos);
+                        lastAtPosition = atPos;
                     }
+                } else {
+                    // 没有@了，重置状态
+                    lastAtPosition = -1;
                 }
             }
         });
@@ -400,6 +378,14 @@ public class GroupChatActivity extends Activity {
                         List<Message> case1Responses = new ArrayList<>();
                         // 解析所有 @ 提及的助手
                         List<Member> targetMembers = parseAllMentionedMembers(content);
+                        
+                        // 调试：打印解析出的成员列表
+                        StringBuilder debugMembers = new StringBuilder("解析结果: ");
+                        for (Member m : targetMembers) {
+                            debugMembers.append(m.getName()).append(", ");
+                        }
+                        Logger.i("GroupChatActivity", debugMembers.toString());
+                        
                         if (!targetMembers.isEmpty()) {
                             Logger.i("GroupChatActivity", "发送给指定助手: " + targetMembers.size() + "个");
                             // 对每个被@的助手发送消息
