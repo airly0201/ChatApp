@@ -45,10 +45,10 @@ jobs:
         name: app-release
     
     - name: Create release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
         files: app-release.apk
-        body: 'ChatApp v3.10 - 群聊消息增加选择复制能力，聊天内容记录日志'
+        body: 'ChatApp v3.16 - 群聊消息选择复制能力，日志记录调测信息'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
