@@ -420,27 +420,14 @@ public class GroupChatActivity extends Activity {
                         break;
                         
                     case 2: // 助手主持 - 协调模式
-                        // 检查消息是否包含 @ 提及，有@则只让被@的助手响应（跳过主持人协调）
-                        List<Member> mentionedForMode2 = parseAllMentionedMembers(content);
-                        if (!mentionedForMode2.isEmpty()) {
-                            Logger.i("GroupChatActivity", "助手主持模式: @指定助手 " + mentionedForMode2.size() + "个，直接响应");
-                            List<Message> case2Responses = new ArrayList<>();
-                            // 对每个被@的助手发送消息
-                            for (Member mentionedMember : mentionedForMode2) {
-                                String messageForMember = buildMessageForMember(mentionedMember, content);
-                                Message singleResponse = dispatcher.sendToMember(mentionedMember, group, messageForMember, messages, promptBuilder);
-                                case2Responses.add(singleResponse);
-                            }
-                            responses = case2Responses;
-                        } else {
-                            Logger.i("GroupChatActivity", "助手主持模式: 先主持人，后成员补充");
-                            List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
-                            // 直接在方法返回时保证不为 null
-                            if (case2Responses == null) {
-                                case2Responses = new ArrayList<>();
-                            }
-                            responses = case2Responses;
+                        // 无论是否有@提及，都先让主持人协调分配任务
+                        Logger.i("GroupChatActivity", "助手主持模式: 主持人(" + group.getHostName() + ")协调中...");
+                        List<Message> case2Responses = dispatcher.coordinateGroup(group, content, messages, promptBuilder);
+                        // 直接在方法返回时保证不为 null
+                        if (case2Responses == null) {
+                            case2Responses = new ArrayList<>();
                         }
+                        responses = case2Responses;
                         break;
                         
                     case 0: // 平等讨论（默认）
