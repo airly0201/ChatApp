@@ -83,11 +83,14 @@ public class MemberDispatcher {
             JSONArray messages = promptBuilder.buildMessagesForAPI(group, member, history, message);
             String response = callAPI(member, messages);
             
+            Logger.i("MemberDispatcher", "sendToMember 成功: " + member.getName());
+            
             return new Message(
                 member.getAvatar() + " " + member.getName(),
                 response
             );
         } catch (Exception e) {
+            Logger.e("MemberDispatcher", "sendToMember 失败: " + member.getName() + ", 错误=" + e.getMessage());
             return new Message(
                 member.getAvatar() + " " + member.getName(),
                 "调用失败: " + e.getMessage()
