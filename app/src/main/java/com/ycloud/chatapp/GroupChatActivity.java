@@ -56,6 +56,10 @@ public class GroupChatActivity extends Activity {
     private Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isLoading = false;
     
+    // @提及功能的状态追踪
+    private boolean isSelectingMember = false;
+    private int lastAtPosition = -1;
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -278,11 +282,8 @@ public class GroupChatActivity extends Activity {
         this.debugPanel = debugPanel;
         updateDebugPanel("就绪");
         
-        // 监听 @ 提及 - 优化版：只在第一次输入@时弹出，选择后直到下一次输入@前不再弹出
+        // 监听 @ 提及 - 优化版：每次输入@都弹出，选择后直到发送/删除前不再弹出
         input.addTextChangedListener(new TextWatcher() {
-            private boolean isSelectingMember = false;
-            private int lastAtPosition = -1;  // 记录最后一个有效的@位置
-            
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             
@@ -308,17 +309,6 @@ public class GroupChatActivity extends Activity {
                     }
                 }
                 
-                // 如果正在选择成员中，且@后面有文字了，说明用户正在选择或已选择，不弹窗
-                if (isSelectingMember && lastAtPosition >= 0) {
-                    String afterAt = (lastAtPosition + 1 < text.length()) ? text.substring(lastAtPosition + 1) : "";
-                    // 如果@后面有非空格文字，说明用户正在输入名字，不弹出
-                    if (!afterAt.isEmpty() && !afterAt.startsWith(" ")) {
-                        return;
-                    }
-                }
-                
-                if (isSelectingMember) return;
-                
                 // 找到光标前的最后一个@（不在空格后的）
                 int atPos = -1;
                 for (int i = cursorPos - 1; i >= 0; i--) {
@@ -332,13 +322,25 @@ public class GroupChatActivity extends Activity {
                 }
                 
                 if (atPos >= 0) {
-                    // @后面是空格或空？显示列表
                     String afterAt = (atPos + 1 < text.length()) ? text.substring(atPos + 1) : "";
+                    boolean isNewAt = (atPos != lastAtPosition);  // 检测是否是一个新的@
+                    
+                    // 如果正在选择成员中，且正在输入名字（@后面有非空格文字），不弹窗
+                    if (isSelectingMember && lastAtPosition >= 0) {
+                        String afterLastAt = (lastAtPosition + 1 < text.length()) ? text.substring(lastAtPosition + 1) : "";
+                        if (!afterLastAt.isEmpty() && !afterLastAt.startsWith(" ")) {
+                            return;  // 正在输入名字，不弹出
+                        }
+                    }
+                    
+                    // 显示列表条件：@后面是空格或空
                     if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
-                        showMemberPopup(input, atPos);
-                        isSelectingMember = true;
-                        lastAtPosition = atPos;
-                        // 不再使用延迟重置，改为手动控制
+                        // 如果是新@，或者之前没有在选择状态，就弹出
+                        if (isNewAt || !isSelectingMember) {
+                            showMemberPopup(input, atPos);
+                            isSelectingMember = true;
+                            lastAtPosition = atPos;
+                        }
                     }
                 }
             }
@@ -365,6 +367,10 @@ public class GroupChatActivity extends Activity {
         input.setText("");
         isLoading = true;
         sendBtn.setEnabled(false);
+        
+        // 重置@提及状态，允许下次输入@时弹出助手列表
+        isSelectingMember = false;
+        lastAtPosition = -1;
         
         // 添加用户消息
         Message userMsg = new Message("你", content);
