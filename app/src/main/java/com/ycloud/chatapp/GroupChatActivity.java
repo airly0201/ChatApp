@@ -282,7 +282,7 @@ public class GroupChatActivity extends Activity {
         this.debugPanel = debugPanel;
         updateDebugPanel("就绪");
         
-        // 监听 @ 提及 - 每次输入@都弹出助手列表
+        // 监听 @ 提及 - 选择助手后继续输入不弹窗，但再次输入新@时弹窗
         input.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -295,6 +295,18 @@ public class GroupChatActivity extends Activity {
                 String text = s.toString();
                 int cursorPos = input.getSelectionStart();
                 if (cursorPos < 0) cursorPos = 0;
+                
+                // 检查是否删除了之前的@（即lastAtPosition所指的@不存在了）
+                if (lastAtPosition >= 0) {
+                    boolean atStillExists = false;
+                    if (lastAtPosition < text.length() && text.charAt(lastAtPosition) == '@') {
+                        atStillExists = true;
+                    }
+                    if (!atStillExists) {
+                        // @被删除了，重置状态
+                        lastAtPosition = -1;
+                    }
+                }
                 
                 // 找到光标前的最后一个@（不在空格后的）
                 int atPos = -1;
@@ -311,15 +323,19 @@ public class GroupChatActivity extends Activity {
                 if (atPos >= 0) {
                     String afterAt = (atPos + 1 < text.length()) ? text.substring(atPos + 1) : "";
                     
-                    // 显示列表条件：@后面是空格或空
-                    if (afterAt.isEmpty() || afterAt.startsWith(" ")) {
-                        // 每次都弹出，让用户选择
+                    // 判断是否是新@（位置与上次不同）
+                    boolean isNewAt = (atPos != lastAtPosition);
+                    
+                    // 如果正在输入名字（@后面有非空格文字），不弹窗
+                    if (lastAtPosition >= 0 && !afterAt.isEmpty() && !afterAt.startsWith(" ")) {
+                        return;
+                    }
+                    
+                    // 显示列表条件：@后面是空格或空 + 是新@或之前没有在选择
+                    if ((afterAt.isEmpty() || afterAt.startsWith(" ")) && (isNewAt || lastAtPosition < 0)) {
                         showMemberPopup(input, atPos);
                         lastAtPosition = atPos;
                     }
-                } else {
-                    // 没有@了，重置状态
-                    lastAtPosition = -1;
                 }
             }
         });
@@ -347,7 +363,6 @@ public class GroupChatActivity extends Activity {
         sendBtn.setEnabled(false);
         
         // 重置@提及状态，允许下次输入@时弹出助手列表
-        isSelectingMember = false;
         lastAtPosition = -1;
         
         // 添加用户消息
